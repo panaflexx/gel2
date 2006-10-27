@@ -1,0 +1,43 @@
+class Foo {
+}
+
+class Bar : Foo {
+}
+
+class Test {
+  // variables
+
+  void TestVariables(int x) {
+    int i;
+    if (x > 3)
+      i = 7;
+    int k = i;  // error: variable must be definitely assigned before use
+  }
+
+  // conversions
+
+  void TestConversions() {
+    int i = 4;
+    char c = i;   // error: can't implicitly convert char to int
+
+    Foo ^f = new Bar();
+    Bar b = f;    // error: can't implicitly convert Foo to Bar
+  }
+
+  // methods
+
+  void F() {
+    return 7;    // error: void method cannot return a value
+  }
+
+  int G() {
+  }  // error: method must return a value
+
+  int H(int x) {
+    if (x > 3)
+      return 7;
+  }  // error: all control paths must return a value
+
+  public static void Main() {
+  }
+}

@@ -1,0 +1,525 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+</head>
+
+
+<body>
+
+This directory contains a set of benchmark programs to compare GEL2's
+performance with that of popular object-oriented programming languages.
+&nbsp;Each benchmark includes versions written in C++, Java, C# and GEL2.
+&nbsp;The benchmarks include the following:<br>
+<ul>
+  <li>binarytrees: from the <a href="http://shootout.alioth.debian.org/">Computer Language Shootout Benchmarks</a>. &nbsp;This program allocates and frees a large number of binary trees.</li>
+  <li>nsieve: also from the Computer Language Shootout site. &nbsp;This
+program counts prime numbers using the well-known Sieve of Eratosthenes
+algorithm. &nbsp;It performs few memory allocations; its inner loop
+involves arrray accesses.</li>
+  <li>sort: on each of a series of iterations, this program generates a
+list of 1,000,000 randomly generated integers and sorts them using a
+recursive mergesort algorithm.</li>
+  <li>sortstring: like the sort benchmark, but uses a list of 400,000 randomly generated strings.</li>
+</ul>
+The following performance measurements were generated on a Pentium 4
+computer running Ubuntu Linux, using the ptime program (see ptime.c in
+this directory).<br>
+<br>
+
+binary-trees 18<br>
+
+
+<br>
+
+
+<table style="text-align: left;" border="1" cellpadding="2" cellspacing="2">
+
+
+  <tbody>
+
+
+    <tr>
+
+
+      <td></td>
+
+
+      <td>CPU (sec)</td>
+
+
+      <td>virtual (Mb)</td>
+
+
+      <td>resident (Mb)</td>
+
+
+      <td>writeable (Mb)</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>C++</td>
+
+
+      <td style="text-align: right;">14.6</td>
+
+
+      <td style="text-align: right;">27.1</td>
+
+
+      <td style="text-align: right;">25.4</td>
+
+
+      <td style="text-align: right;">24.9</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>Java</td>
+
+
+      <td style="text-align: right;">15.7</td>
+
+
+      <td style="text-align: right;">265.8</td>
+
+
+      <td style="text-align: right;">56.4</td>
+
+
+      <td style="text-align: right;" 199.7="">199.8</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>C#</td>
+
+
+      <td style="text-align: right;">22.9</td>
+
+
+      <td style="text-align: right;">86.3</td>
+
+
+      <td style="text-align: right;">68.1</td>
+
+
+      <td style="text-align: right;">65.5</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>GEL2</td>
+
+
+      <td style="text-align: right;">19.7</td>
+
+
+      <td style="text-align: right;">27.2</td>
+
+
+      <td style="text-align: right;">25.4</td>
+
+
+      <td style="text-align: right;">24.9</td>
+
+
+    </tr>
+
+
+  
+  </tbody>
+</table>
+
+
+<br>
+
+
+nsieve 12<br>
+
+
+<br>
+
+
+<table style="text-align: left;" border="1" cellpadding="2" cellspacing="2">
+
+
+  <tbody>
+
+
+    <tr>
+
+
+      <td></td>
+
+
+      <td>CPU (sec)</td>
+
+
+      <td>virtual (Mb)</td>
+
+
+      <td>resident (Mb)</td>
+
+
+      <td>writeable (Mb)</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>C++</td>
+
+
+      <td style="text-align: right;">5.0</td>
+
+
+      <td style="text-align: right;">42.5</td>
+
+
+      <td style="text-align: right;">40.6</td>
+
+
+      <td style="text-align: right;">40.2</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>Java</td>
+
+
+      <td style="text-align: right;">8.6</td>
+
+
+      <td style="text-align: right;">265.3</td>
+
+
+      <td style="text-align: right;">50.7</td>
+
+
+      <td style="text-align: right;" 199.7="">199.3</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>C#</td>
+
+
+      <td style="text-align: right;">8.8</td>
+
+
+      <td style="text-align: right;">64.9</td>
+
+
+      <td style="text-align: right;">46.7</td>
+
+
+      <td style="text-align: right;">44.0</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>GEL2</td>
+
+
+      <td style="text-align: right;">9.4</td>
+
+
+      <td style="text-align: right;">42.6</td>
+
+
+      <td style="text-align: right;">40.8</td>
+
+
+      <td style="text-align: right;">40.3</td>
+
+
+    </tr>
+
+
+  
+  </tbody>
+</table>
+
+<br>
+
+sort 5<br>
+
+
+<br>
+
+
+<table style="text-align: left;" border="1" cellpadding="2" cellspacing="2">
+
+
+  <tbody>
+
+
+    <tr>
+
+
+      <td></td>
+
+
+      <td>CPU (sec)</td>
+
+
+      <td>virtual (Mb)</td>
+
+
+      <td>resident (Mb)</td>
+
+
+      <td>writeable (Mb)</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>C++</td>
+
+
+      <td style="text-align: right;">11.9</td>
+
+
+      <td style="text-align: right;">18.2</td>
+
+
+      <td style="text-align: right;">16.3</td>
+
+
+      <td style="text-align: right;">15.9</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>Java</td>
+
+
+      <td style="text-align: right;">6.0</td>
+
+
+      <td style="text-align: right;">265.8</td>
+
+
+      <td style="text-align: right;">37.8</td>
+
+
+      <td style="text-align: right;" 199.7="">199.8</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>C#</td>
+
+
+      <td style="text-align: right;">6.6</td>
+
+
+      <td style="text-align: right;">69.2</td>
+
+
+      <td style="text-align: right;">48.0</td>
+
+
+      <td style="text-align: right;">48.4</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>GEL2</td>
+
+
+      <td style="text-align: right;">7.9</td>
+
+
+      <td style="text-align: right;">18.2</td>
+
+
+      <td style="text-align: right;">16.4</td>
+
+
+      <td style="text-align: right;">15.9</td>
+
+
+    </tr>
+
+
+  
+  </tbody>
+</table>
+
+<br>
+
+sortstring 5<br>
+
+<br>
+
+<table style="text-align: left;" border="1" cellpadding="2" cellspacing="2">
+
+
+  <tbody>
+
+
+    <tr>
+
+
+      <td></td>
+
+
+      <td>CPU (sec)</td>
+
+
+      <td>virtual (Mb)</td>
+
+
+      <td>resident (Mb)</td>
+
+
+      <td>writeable (Mb)</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>C++</td>
+
+
+      <td style="text-align: right;">7.5</td>
+
+
+      <td style="text-align: right;">25.2</td>
+
+
+      <td style="text-align: right;">23.4</td>
+
+
+      <td style="text-align: right;">23.0</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>Java</td>
+
+
+      <td style="text-align: right;">6.7</td>
+
+
+      <td style="text-align: right;">265.8</td>
+
+
+      <td style="text-align: right;">60.1</td>
+
+
+      <td style="text-align: right;" 199.7="">200.0</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>C#</td>
+
+
+      <td style="text-align: right;">10.2</td>
+
+
+      <td style="text-align: right;">60.9</td>
+
+
+      <td style="text-align: right;">42.3</td>
+
+
+      <td style="text-align: right;">40.1</td>
+
+
+    </tr>
+
+
+    <tr>
+
+
+      <td>GEL2</td>
+
+
+      <td style="text-align: right;">7.1</td>
+
+
+      <td style="text-align: right;">34.7</td>
+
+
+      <td style="text-align: right;">32.9</td>
+
+
+      <td style="text-align: right;">32.4</td>
+
+
+    </tr>
+
+
+  
+  </tbody>
+</table>
+
+<br>
+
+<br>
+
+
+</body>
+</html>

@@ -1,0 +1,87 @@
+import "library.cpp";
+
+// math
+
+extern class Math {
+  public static double Sqrt(double d);
+}
+
+// I/O
+
+extern class Console {
+  public static void Write(object o);
+  public static void Write(string s, object o);
+  public static void Write(string s, object o1, object o2);
+  public static void Write(string s, object o1, object o2, object o3);
+
+  public static void WriteLine(object o);
+  public static void WriteLine(string s, object o);
+  public static void WriteLine(string s, object o1, object o2);
+  public static void WriteLine(string s, object o1, object o2, object o3);
+}
+
+extern class File {
+  public static void Delete(string path);
+  public static bool Exists(string path);
+  public static string ReadAllText(string path);
+}
+
+extern class Path {
+  public static string Combine(string path1, string path2);
+  public static string GetDirectoryName(string path);
+  public static string GetExtension (string path);
+  public static string GetFileNameWithoutExtension(string path);
+  public static string GetTempFileName();
+}
+
+extern class StreamReader {
+  public StreamReader(string filename);
+
+  public void Close();
+
+  public int Read();
+  public int Peek();
+  public string ReadToEnd();
+}
+
+extern class StreamWriter {
+  public StreamWriter(string filename);
+
+  public void Close();
+
+  public void Write(object o);
+  public void Write(string s, object o);
+  public void Write(string s, object o1, object o2);
+  public void Write(string s, object o1, object o2, object o3);
+
+  public void WriteLine(object o);
+  public void WriteLine(string s, object o);
+  public void WriteLine(string s, object o1, object o2);
+  public void WriteLine(string s, object o1, object o2, object o3);
+}
+
+// system
+
+extern class Environment {
+  public static void Exit(int code);
+  public static OperatingSystem OSVersion { get; }
+  public static string GetEnvironmentVariable(string value);
+}
+
+extern class OperatingSystem {
+  public int Platform { get; }
+}
+
+extern class PlatformID {
+  public const int Unix = 0, Win32NT = 1;
+}
+
+extern class Process {
+  public static Process GetCurrentProcess();
+  public ProcessModule MainModule { get; }
+  public static int System(string command);
+}
+
+extern class ProcessModule {
+  public string FileName { get; }
+}

@@ -1,0 +1,245 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+
+
+  
+  
+  <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
+
+
+
+
+  
+  
+  
+  <link rel="stylesheet" type="text/css" href="designstyle.css">
+
+
+  
+  
+  <title>The GEL2 Compiler/Interpreter</title>
+</head>
+
+
+<body>
+
+
+
+<h1>The GEL2 Compiler/Interpreter</h1>
+
+
+<address><a href="mailto:adam@medovina.org">Adam Dingle</a></address>
+
+
+
+
+<h2>Introduction</h2>
+
+
+
+<p>Google Experimental Language #2 (GEL2) is an experimental
+object-oriented language with an ownership-based type system. &nbsp;The
+<code>doc</code> subdirectory contains an <a href="doc/gel2_language.html">overview and detailed description</a> of the language.</p>
+
+
+<p>GEL2 originated as a research project I developed while working
+at Google.
+&nbsp;I'd like to thank Google for allowing me to release GEL2
+as open source.</p>
+
+
+This implementation of GEL2 includes an interpreter and a compiler which generates C++ code, mostly intended as an experimental
+prototype. &nbsp;Emitting C++ code&nbsp;is limiting in a
+number of ways: compilation may be relatively slow, certain constructs
+are awkward to emit as C++, and it would be difficult to build a
+source-level debugger for&nbsp;this implementation of GEL2. &nbsp;It would
+be useful to have a production compiler for a GEL2-like language
+implemented as a front end to GCC.
+<h2>Quick start<br>
+
+
+
+</h2>
+
+
+
+<h3>Building on Linux</h3>
+
+
+
+
+<p>The GEL2 compiler is bootstrapped using C#. &nbsp;To build on Linux, you'll need the open-source C# compiler <a href="http://www.mono-project.com/">Mono</a>, which is available prepackaged for most Linux distributions. &nbsp;Make sure that the Mono compiler and runtime are in
+your PATH; GEL2 needs both the C# compiler <code>mcs</code> and the runtime executable <code>mono</code>.</p>
+
+
+
+To build, just run <code>make</code>. You'll see a few warnings while Jay is built; this is normal.&nbsp; 
+If all goes well you'll end up with two executables: <code>gel2.exe</code> and
+<code>gel2a</code>.&nbsp; The first of these is GEL2 built using C#; it's a Mono 
+executable containing managed code.&nbsp; The second of these is GEL2 built using GEL2 itself; this is a native executable and 
+will run without Mono installed.&nbsp; The two executables should behave 
+more or less identically.<br>
+
+
+
+<br>
+
+
+
+For the most part, GEL2 is written portably and uses few
+operating-system-specific calls. &nbsp;It should be straightforward to
+port GEL2 to any Unix system.
+<h3>Building on Windows</h3>
+
+
+
+
+<p>To build GEL2 on Windows, you'll probably need Visual Studio 2005.&nbsp; (We 
+haven't tried building with Visual Studio 2003; it might or might not work)&nbsp; 
+To build, go to a command line and run <code>build.bat</code> 
+in this directory.&nbsp; This should build the Jay parser generator, the Lea memory 
+allocator, and finally GEL2 
+itself.&nbsp; You'll end up with two executables: <code>gel2.exe</code> and
+<code>gel2a.exe</code>&nbsp;which should be functionally identical as described in the Linux build instructions above.</p>
+
+
+
+
+<p>Alternatively, it may be possible 
+to build GEL2 on Windows using cygwin and the Windows build of mono. &nbsp;We haven't tried this.</p>
+
+
+
+
+
+<h2>Files in this directory</h2>
+
+
+
+
+<h3>The GEL2 implementation</h3>
+
+
+
+
+<p>The GEL2 sources are in the following files:</p>
+
+
+
+
+<p><code>gel2.gel2</code> contains the GEL2 lexer, type checker, interpreter and 
+compiler.</p>
+
+
+
+
+<p><code>gel2.jay</code> contains the grammar used to generate the GEL2 parser; when 
+we run <code>jay</code> on this file, it writes the parser into <code>gel2.tab.gel2</code> 
+.</p>
+
+
+
+
+<p><code>internal.cpp</code> contains the C++ runtime for GEL2; this gets compiled 
+into every GEL2 program.&nbsp; The runtime includes C++ implementations of all the 
+built-in classes the compiler knows about.</p>
+
+
+
+
+<p><code>internal.gel2</code> contains GEL2 definitions for the classes implemented in <code>
+internal.cpp</code>.&nbsp; The GEL2 compiler reads <code>internal.gel2</code> to find 
+out method and type information about these classes.</p>
+
+
+
+
+<p><code>library.cpp </code>contains a simple class library for GEL2,
+implemented in C++. &nbsp;The GEL2 compiler has no special knowledge of
+classes in this file.</p>
+
+
+
+<code></code>
+<p><code>library.gel2</code> contains GEL2 definitions for the classes implemented in <code>library.cpp</code>.</p>
+
+
+
+<code>gel2_collection.gel2</code> contains the collection classes <code>ArrayList</code> and <code>Hashtable</code>, written in GEL2.
+<p><code>gel2.cs</code> contains a C# version of the GEL2 interpreter/compiler.&nbsp;
+<code>gel2.cs</code> is quite similar to <code>gel2.gel2</code>; most lines in these two 
+files are identical.&nbsp; We use this file to bootstrap 
+the system using the C# compiler.&nbsp; We currently do most GEL2 development in
+<code>gel2.cs</code> and only later merge changes into <code>gel2.gel2</code>; we do 
+this because there's no GEL2 debugger and it's convenient to be able to debug 
+problems using the C# debugger.</p>
+
+
+
+
+<h3>Jay</h3>
+
+
+
+
+<p>We build the GEL2 parser using Jay, a parser generator directly derived from 
+Berkeley Yacc.&nbsp; The <code>jay</code> subdirectory contains the sources for 
+Jay, which we've slightly modified to work with GEL2.</p>
+
+
+
+
+<h3>The Lea allocator</h3>
+
+
+
+
+<p>The files <code>dlmalloc.c</code> and <code>dlmalloc.h</code> contain the
+<a href="http://gee.cs.oswego.edu/dl/">Lea memory allocator</a>.&nbsp; On Windows, GEL2&nbsp;uses this allocator by default since it's proven to be faster than the 
+Windows allocator in our benchmarks so far.&nbsp; Actually the Lea allocator 
+seems to allocate just about as quickly as the Windows low-frag heap, but the 
+Lea allocator uses only 4 bytes of overhead per allocated object whereas the 
+Windows heap uses 8 bytes, and the resulting memory savings tends to improve memory 
+locality and hence make our benchmarks run faster.<br>
+
+
+
+</p>
+
+
+
+<h3>Tests</h3>
+
+
+
+
+<p><code>test.gel2</code> contains tests which should ideally exercise every 
+feature of the GEL2 language, but which are certainly incomplete at the moment.&nbsp; 
+It's a good idea to try compiling and running <code>test.gel2</code> after every 
+significant compiler change.</p>
+
+
+
+
+<p><code>test_runcheck.gel2</code> contains an incomplete set of tests for the 
+various checks that GEL2 makes at run time.</p>
+
+
+
+
+<p><code>test_check.gel2</code> conatains an incomplete set of tests for GEL2's 
+compile-time checks.&nbsp; Compiling this file will result in a number 
+of errors - this is by design. The file contains a number of comments which 
+begin with "<code>error :</code>" ; these are where errors should occur.&nbsp; 
+When you compile the file using the GEL2 compiler's (undocumented) <code>-e</code> 
+flag, GEL2 will verify that errors occur exactly on the lines with these comments.</p>
+
+
+
+<br>
+
+
+
+</body>
+</html>

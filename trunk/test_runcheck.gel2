@@ -1,0 +1,168 @@
+// Test GEL2's runtime checks.
+
+option memory(own);
+
+class Foo {
+  Foo ^foo_;
+
+  public int Get() { return 4; }
+  public Foo GetFoo() { return null; }
+
+  public void Put(Foo ^f) { foo_ = f; }
+  public void Clear(Foo f) { foo_ = null; }
+
+  public Foo PropClear { set { foo_ = null; } }
+
+  public Foo Self() { return this; }
+}
+
+class Baz {
+}
+
+class Sa {
+  public Foo ^f_;
+}
+
+class Ta : Sa {
+}
+
+class Ga : Ta {
+  public Baz ^b_;
+}
+
+class Clearer {
+  public Clearer(Test t) { t.Clear(); }
+}
+
+class Test {
+  Foo ^foo_;
+
+  public void Clear() { foo_ = null; }
+
+  int Prop { get { Clear(); return 0; } set { Clear(); } }
+
+  int this [ int i ] { get { Clear(); return 0; } set { Clear(); } }
+
+  Foo Fun() { return new Foo().Self(); }
+
+  void RefCheck(int n) {
+    foo_ = new Foo();
+
+    switch (n) {
+      case 0:
+        Foo f = foo_;
+        foo_ = null;    // assign to a field
+        Foo g = f;
+        break;
+      case 1:
+        Foo f = foo_;
+        Clear();        // call a method
+        Foo g = f;
+        break;
+      case 2:
+        Foo f = foo_;
+        int i = Prop;   // get a property
+        Foo g = f;
+        break;
+      case 3:
+        Foo f = foo_;
+        Prop = 4;       // set a property
+        Foo g = f;
+        break;
+      case 4:
+        Foo f = foo_;
+        int i = this[2];    // get an indexer
+        Foo g = f;
+        break;
+      case 5:
+        Foo f = foo_;
+        this[3] = 4;    // set an indexer
+        Foo g = f;
+        break;
+      case 6:
+        Foo f = foo_;
+        new Clearer(this);  // call a constructor
+        Foo g = f;
+        break;
+      case 7:
+        Foo f;
+        {
+          Foo ^z = new Foo();
+          f = z;
+        }
+        Foo g = f;  // exit a block
+        break;
+      case 8:
+        Foo f = null;
+        switch (2) {
+          case 2:
+            Foo ^z = new Foo();
+            f = z;
+            break;  // break out of a switch statement
+        }
+        Foo g = f;
+        break;
+      case 9:
+        Foo f = null;
+        while (true) {
+          Foo ^z = new Foo();
+          f = z;
+          break;  // break out of a while loop
+        }
+        Foo g = f;
+        break;
+      case 10:
+        Foo ^z = new Foo();
+        Foo f = z;
+        f.Put(z);
+        f.Clear(f = null);  // assignment in argument
+        break;
+      case 11:
+        Foo ^z = new Foo();
+        Foo f = z;
+        (take z).Get();     // destroy a temporary
+        Foo g = f;
+        break;
+      case 12:
+        Foo ^z = new Foo();
+        Foo f = z;
+        int i = 0;
+        for (Foo ^y = z; i < 5 ; ++i)
+          ;                // destroy a variable declared in a for statement
+        Foo g = f;
+        break;
+      case 13:
+        Foo ^z = new Foo();
+        Foo f = z;
+        f.Put(z);
+        f.PropClear = (f = null);   // assignment in property argument
+        break;
+      case 14:
+        Foo ^z = new Foo();
+        Foo f;
+        {
+          Ta ^ta = new Ta();
+          ta.f_ = z;
+          f = ta.f_;
+        }  // destroys ta, which destroys ta.f_
+        Foo g = f;
+        break;
+      case 15:
+        Foo f = Fun();
+        break;
+      case 16:
+        Foo f = new Foo().Self();
+        Foo g = f;
+        break;
+    }
+  }
+
+  public static void Main(string[] args) {
+    if (args.Length == 0) {
+      Console.WriteLine("usage: test_runcheck <number>");
+      return;
+    }
+    int i = int.Parse(args[0]);
+    new Test().RefCheck(i);
+  }
+}

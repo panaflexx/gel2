@@ -1,0 +1,75 @@
+import "internal.cpp";
+
+extern abstract class Object {
+  public Object();
+  public virtual bool Equals(Object o);
+  public virtual int GetHashCode();
+  public virtual string ToString();
+}
+
+extern class Bool {
+}
+
+extern class Char {
+  public static bool IsDigit(char c);
+  public static bool IsLetter(char c);
+  public static bool IsWhiteSpace(char c);
+}
+
+extern class Double {
+  public static double Parse(string s);
+}
+
+extern class Int {
+  public static int Parse(string s);
+  public static int Parse(string s, int style);
+}
+
+extern class Single {
+  public static float Parse(string s);
+}
+
+extern class Array {
+  public static void Copy(Array source, int source_index, Array dest, int dest_index, int length);
+  public void CopyTo(Array array, int index);
+  public int Length { get; }
+}
+
+extern class String {
+  public static string New(char[] a);
+
+  public char this[int index] { get; }
+
+  public static int CompareOrdinal(string s, string t);
+  public bool EndsWith(string s);
+  public static string Format(string s, object o);
+  public static string Format(string s, object o1, object o2);
+  public static string Format(string s, object o1, object o2, object o3);
+  public int IndexOf(char c);
+  public int LastIndexOf(char c);
+  public int Length { get; }
+  public bool StartsWith(string s);
+  public string Substring(int start_index, int length);
+}
+
+extern class StringBuilder {
+  public StringBuilder();
+  public void Append(char c);
+  public void Append(string s);
+  public void AppendFormat(string s, object o);
+  public void AppendFormat(string s, object o1, object o2);
+  public void AppendFormat(string s, object o1, object o2, object o3);
+  public override string ToString();
+}
+
+extern class Pool {
+  public Pool();
+}
+
+extern class Debug {
+  public static void Assert(bool b);
+}
+
+extern class NumberStyles {
+  public const int Integer = 0, HexNumber = 1;
+}

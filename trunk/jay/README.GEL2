@@ -1,0 +1,5 @@
+This directory contains a copy of jay, a parser generator for C# and Java derived from Berkeley yacc.  The jay sources came from here originally:
+
+http://www.cs.rit.edu/~ats/projects/src.zip
+
+We've modified jay slightly to be able to generate GEL2 code.

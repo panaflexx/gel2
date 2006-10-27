@@ -1,0 +1,25 @@
+// must be implemented by a scanner object to supply input to the parser
+public abstract class yyInput {
+  // move on to next token; returns false if positioned beyond tokens
+  public abstract bool Advance ();
+
+  // classifies current token by <c>%token</c> value or single character.
+  // should not be called if <c>Advance()</c> returned false.
+  public abstract int GetToken();
+
+  // value associated with current token.
+  // should not be called if <c>Advance()</c> returned false.
+  public abstract object ^GetValue();
+
+  public virtual void yyError (string message, string[] expected) {
+    if ((expected != null) && (expected.Length > 0)) {
+      Console.Write(message + ", expecting");
+      for (int n = 0; n < expected.Length; ++ n)
+        Console.Write(" " + expected[n]);
+        Console.WriteLine("");
+    } else
+      Console.WriteLine(message);
+  }
+
+  public abstract void Fatal();
+}

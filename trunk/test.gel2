@@ -1,0 +1,557 @@
+option memory(own);
+
+using System;
+using System.Collections;
+
+class ClassTest {
+  // constants
+
+  const int const_i = 4;
+  const bool const_b = true;
+
+  // fields
+
+  int x_ = 4;
+  static int j_ = 7;
+
+  // methods
+
+  int Add(int a, int b) { return a + b; }
+
+  void Swap(ref int a, ref int b) {
+    int t = a;
+    a = b;
+    b = t;
+  }
+
+  void Fun(int a, out int b, out int c) {
+    b = a + 1;
+    c = a + 2;
+  }
+
+  // properties
+
+  int Prop { get { return x_; } set { x_ = value; } }
+
+  // indexers
+
+  int this[int i] { get { return x_ + i; } set { x_ = value + i; } }
+
+  public bool Test() {
+    bool ok = true;
+
+    ok &= (const_i == 4);
+    ok &= const_b;
+    ok &= (x_ == 4);
+    ok &= (j_ == 7);
+    ok &= (Add(3, 4) == 7);
+
+    int x = 2;
+    int y = 5;
+    Swap(ref x, ref y);
+    ok &= (x == 5 && y == 2);
+
+    Fun(3, out x, out y);
+    ok &= (x == 4 && y == 5);
+
+    this.Prop = 8;
+    ok &= (this.Prop == 8);
+
+    this[4] = 5;
+    ok &= (this[2] == 11);
+
+    return ok;
+  }
+}
+
+class ArrayTest {
+  static int[] ^int_arr = { 3, 4, 5 };
+  static string[] ^string_arr = { "yo", "yo", "ma" };
+
+  public static bool Test() {
+    bool ok = true;
+
+    int sum = 0;
+    for (int i = 0; i < int_arr.Length; ++i)
+      sum += int_arr[i];
+    ok &= (sum == 12);
+
+    string s = "";
+    for (int i = 0; i < string_arr.Length; ++i)
+      s = s + string_arr[i];
+    ok &= (s == "yoyoma");
+
+    int[] ^a = new int[4];
+    int_arr.CopyTo(a, 1);
+    ok &= (a[0] == 0);
+    ok &= (a[2] == 4);
+
+    string[] ^sa = new string[5];
+    string_arr.CopyTo(sa, 1);
+    ok &= (sa[0] == null);
+    ok &= (sa[2] == "yo");
+ 
+    Foo ^foo = new Foo(3);
+    object[] ^a1 = new object[3];
+    object[] ^a2 = new object[4];
+    a1[0] = foo;
+    a1.CopyTo(a2, 1);
+    ok &= (a2[0] == null);
+    ok &= (a2[1] == foo);
+
+    object ^o = new Foo[3];
+    Foo[] f = (Foo[]) o;
+
+    return ok;
+  }
+}
+
+class Foo {
+  public readonly int x_;
+  public Foo ^next_ = null;
+
+  public Foo(int x) { x_ = x; }
+  public Foo() : this(1) { }
+
+  public Foo This() { return this; }
+
+  public virtual int Get() { return x_; }
+}
+
+class Bar : Foo {
+  public Bar(int x) : base(x) { }
+  public Bar() : this(2) { }
+
+  public override int Get() {
+    return base.Get() + 1;
+  }
+}
+
+class Baz : Bar {
+  public Baz(int x) : base(x) { }
+}
+
+class BasicTest {
+  public static bool TestConversions() {
+    // implicit numeric conversions
+    char c = 'a';
+    int i = c;
+
+    // implicit reference conversions
+    Bar ^b = new Bar(0);
+    object o = b;
+    Foo f = b;
+    int[] ^a = new int[2];
+    Array arr = a;
+    f = null;
+
+    // boxing conversions
+    object ^p = 4;
+
+    // explicit numeric conversions
+    c = (char) i;
+
+    // explicit reference conversions
+    p = new Foo(0);
+    f = (Foo) o;
+    int[] a2 = (int[]) arr;
+
+    // unboxing conversions
+    p = 4;
+    i = (int) p;
+
+    return true;
+  }
+
+  static bool TestPrimary() {
+    bool ok = true;
+
+    // parenthesized expressions
+
+    ok &= ((2 + 2) * (3 + 3) == 24);
+
+    // member access
+
+    ok &= (new Foo(4).x_ == 4);
+
+    // element access
+
+    int[] ^a = new int[3];
+    a[1] = 7;
+    ok &= (a[1] == 7);
+
+    // this access
+
+    Foo ^f = new Foo(0);
+    ok &= (f == f.This());
+
+    // base access
+
+    Bar ^b = new Bar(4);
+    ok &= (b.Get() == 5);
+
+    // postfix inc/dec operators
+
+    int x = 2;
+    ok &= (x++ == 2);
+    ok &= (x-- == 3);
+    ok &= (x == 2);
+
+    // new operator
+
+    new Foo(3);
+
+    return ok;
+  }
+
+  static bool TestUnary() {
+    bool ok = true;
+
+    // logical negation operator
+
+    ok &= (!false);
+
+    // prefix inc/dec operators
+
+    int x = 2;
+    ok &= (++x == 3);
+    ok &= (--x == 2);
+    ok &= (x == 2);
+
+    // cast expressions
+
+    Foo ^f = new Bar(4);
+    Bar b = (Bar) f;
+    ok &= (b.Get() == 5);
+
+    return ok;
+  }
+
+  static bool TestArithmetic() {
+    bool ok = true;
+
+    // multiplication
+    ok &= (3 * 3 == 9);
+
+    // division
+    ok &= (7 / 2 == 3);
+
+    // remainder
+    ok &= (10 % 3 == 1);
+
+    // addition
+    ok &= (2 + 3 == 5);
+
+    // subtraction
+    ok &= (7 - 2 == 5);
+
+    return ok;
+  }
+
+  static bool TestShift() {
+    bool ok = true;
+
+    ok &= (1 << 4 == 16);
+    ok &= (16 >> 4 == 1);
+
+    return ok;
+  }
+
+  static bool TestRelational() {
+    bool ok = true;
+
+    // integer comparison
+
+    ok &= (3 == 3 && 3 != 4 && 3 < 4 && 4 > 3 && 3 <= 4 && 4 >= 3);
+
+    // boolean equality
+
+    ok &= (true == true && true != false);
+
+    // reference type equality
+
+    Foo ^f = new Foo(3);
+    Foo ^g = new Foo(3);
+
+    ok &= (f == f);
+    ok &= (f != g);
+
+    // string equality
+
+    ok &= ("yo" == "yo");
+    ok &= ("yo" != "mo");
+
+    return ok;
+  }
+
+  static bool TestIsAs() {
+    bool ok = true;
+
+    Foo ^f = new Bar(3);
+    ok &= (f is Bar && !(f is Baz));
+
+    ok &= (f as Baz == null);
+    Bar b = f as Bar;
+    ok &= (b.Get() == 4);
+
+    return ok;
+  }
+
+  static bool TestLogical() {
+    bool ok = true;
+
+    // integer logical operators
+
+    ok &= ((1 | 2) == 3);
+    ok &= ((6 & 4) == 4);
+
+    // boolean logical operators
+
+    ok &= ((true | false) == true);
+    ok &= ((true & false) == false);
+
+    return ok;
+  }
+
+  static bool TestConditionalLogical() {
+    bool ok = true;
+
+    int x;
+    ok &= ((x = 4) == 4 || (x = 5) == 5);
+    ok &= (x == 4);
+    ok &= !((x = 3) == 4 && (x = 2) == 3);
+    ok &= (x == 3);
+
+    return ok;
+  }
+
+  static bool TestConditional() {
+    bool ok = true;
+
+    ok &= ((5 > 4 ? 1 : 2) == 1);
+    ok &= ((4 > 5 ? 1 : 2) == 2);
+
+    return ok;
+  }
+
+  static bool TestAssignment() {
+    bool ok = true;
+
+    int x;
+    x = 2;
+    ok &= (x == 2);
+    x += 3;
+    ok &= (x == 5);
+    x -= 1;
+    ok &= (x == 4);
+    x *= 4;
+    ok &= (x == 16);
+    x /= 2;
+    ok &= (x == 8);
+    x %= 5;
+    ok &= (x == 3);
+    x &= 2;
+    ok &= (x == 2);
+    x |= 1;
+    ok &= (x == 3);
+
+    return ok;
+  }
+
+  public static bool TestExpressions() {
+    return TestPrimary() && TestUnary() && TestArithmetic() && TestShift() && TestRelational() &&
+           TestIsAs() && TestLogical() && TestConditionalLogical() && TestConditional() &&
+           TestAssignment();
+  }
+
+  static bool TestSelection() {
+    bool ok = true;
+
+    // if statement
+
+    int x = 3;
+
+    if (5 > 4)
+      x = 4;
+
+    if (x != 4)
+      ok = false;
+    else
+      ok = ok;
+
+    // switch statement
+
+    switch (2 + 2) {
+      case 3:
+      default:
+        int y = 4;
+        ok = false;
+        break;
+      case 4:
+        ok = ok;
+        break;
+    }
+
+    return ok;
+  }
+
+  static bool TestIteration() {
+    bool ok = true;
+
+    // while statement
+
+    int sum = 0;
+    int x = 1;
+    while (x <= 10) {
+      sum += x;
+      ++x;
+    }
+    ok &= (sum == 55);
+
+    // do statement
+
+    sum = 0;
+    x = 1;
+    do {
+      sum += x;
+      ++x;
+    } while (x <= 10);
+    ok &= (sum == 55);
+
+    // for statement
+
+    sum = 0;
+    for (int y = 1; y <= 10; ++y)
+      sum += y;
+    ok &= (sum == 55);
+
+    // foreach statement
+
+    ArrayList ^a = new ArrayList();
+    for (int y = 1; y <= 10; ++y)
+      a.Add(y);
+    sum = 0;
+    foreach (int y in a)
+      sum += y;
+    ok &= (sum == 55);
+
+    return ok;
+  }
+
+  static void Fun() { }
+
+  public static bool TestStatements() {
+    bool ok = true;
+
+    // empty statement
+
+    ;
+
+    for (int i = 0; i < 3; ++i)
+      ;
+
+    // declaration statements
+
+    int x, y = 4, z = 5;
+    x = 3;
+    ok &= (x == 3 && y == 4 && z == 5);
+
+    // expression statements
+
+    Fun();
+    new Test();
+    x = 3;
+    x++;
+    x--;
+    ++x;
+    --x;
+    ok &= (x == 3);
+
+    ok &= TestSelection();
+    ok &= TestIteration();
+
+    return ok;
+  }
+}
+
+class OwnershipTest {
+  static Foo f_;
+  static Foo ^foo_;
+
+  static Foo ^F(Foo ^f) {
+    return f;
+  }
+
+  static Foo G(Foo f) {
+    return f;
+  }
+
+  public static bool Test() {
+    bool ok = true;
+
+    // assignment
+
+    Foo ^f = new Foo();
+    Foo ^g = f;   // transfer owning to owning
+    Foo h = g;    // convert owning to non-owning
+    Foo i = h;    // both non-owning
+    Foo j;
+    j = g;        // convert owning to non-owning
+    f = null;     // convert null to owning
+
+    // function calls
+
+    Foo ^f2 = new Foo();
+    F(f2);
+    F(new Foo());
+
+    Foo ^f3 = new Foo();
+    G(f3);
+    G(new Foo());
+    G(h);
+
+    // owning fields and the take operator
+
+    Foo ^f4 = new Foo();
+    Foo k = f4.next_;
+    Foo ^l = take f4.next_;
+    Foo m = foo_;
+    Foo ^n = take foo_;
+
+    // equality
+
+    Foo ^o = new Foo();
+    Foo p = o;
+    ok &= (o == p);
+
+    // conditional
+
+    Foo ^q = new Foo();
+    Foo ^r = new Foo();
+    Foo s = q == null ? r : q;
+    ok &= (s == q);
+
+    // casts
+
+    Foo ^t = new Bar();
+    Bar ^u = (Bar) t;
+    Bar v = (Bar) u;
+
+    // test group destruction
+    foo_ = new Foo();
+    f_ = foo_;
+
+    return ok;
+  }
+}
+
+class Test {
+  public static void Main() {
+    Console.WriteLine("conversions: " + BasicTest.TestConversions());
+    Console.WriteLine("expressions: " + BasicTest.TestExpressions());
+    Console.WriteLine("statements: " + BasicTest.TestStatements());
+    Console.WriteLine("classes: " + new ClassTest().Test());
+    Console.WriteLine("arrays: " + ArrayTest.Test());
+    Console.WriteLine("ownership: " + OwnershipTest.Test());
+  }
+}

@@ -1,0 +1,31 @@
+all: jay\src\jay.exe debug\dlmalloc.obj release\dlmalloc.obj gel2a.exe
+
+jay\src\jay.exe:
+	$(MAKE) -C jay\src jay
+
+debug\dlmalloc.obj:
+  cl /nologo /c /D "USE_DL_PREFIX" /W3 /Fo"debug\\" dlmalloc.c 
+
+release\dlmalloc.obj:
+  cl /nologo /c /D "USE_DL_PREFIX" /W3 /Fo"release\\" dlmalloc.c 
+
+gel2.tab.cs: gel2_cs.jay
+	jay\src\jay -cv gel2_cs.jay < jay\cs\skeleton.cs > gel2.tab.cs
+
+gel2.exe: gel2.cs gel2.tab.cs
+	csc /nologo gel2.cs gel2.tab.cs
+
+gel2.tab.gel2: gel2.jay
+	jay\src\jay -cov gel2.jay < jay\gel2\skeleton.gel2 > gel2.tab.gel2
+
+gel2a.exe: gel2.exe gel2.gel2 gel2.tab.gel2
+	gel2 -c -d -o gel2a gel2.gel2
+
+gel2b.exe: gel2a.exe gel2.gel2 gel2.tab.c
+	gel2a -c -d -o gel2b gel2.gel2
+
+helloworld: helloworld.gel2
+	gel2 -c -d -o helloworld helloworld.gel2
+
+clean:
+	del *.exe gel2.tab.gel2 gel2.tab.cs gel2a.cpp gel2b.cpp helloworld.cpp y.output

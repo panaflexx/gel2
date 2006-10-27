@@ -1,0 +1,4416 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+
+
+
+  
+  
+  <link rel="stylesheet" type="text/css" href="designstyle.css">
+
+
+
+  
+  
+  <title>The GEL2 Programming Language</title>
+</head>
+
+
+<body>
+
+
+<h1>The GEL2 Programming Language</h1>
+
+
+
+<address>
+	<a href="mailto:adam@medovina.org">Adam Dingle</a></address>
+
+
+
+<h2>Contents in brief</h2>
+
+
+
+<ul>
+
+
+
+	<li><a href="#introduction">Introduction</a></li>
+
+
+
+	<li><a href="#overview:%20ownership">Overview: Ownership</a></li>
+
+
+
+	<li><a href="#overview:%20allocation">Overview: Memory Allocation</a></li>
+
+
+
+	<li><a href="#running%20gel2">Running GEL2</a></li>
+
+
+
+	<li><a href="#syntactic%20conventions">Syntactic Conventions</a></li>
+
+
+
+	<li><a href="#lexical%20structure">Lexical Structure</a></li>
+
+
+
+	<li><a href="#types">Types</a></li>
+
+
+
+	<li><a href="#basic%20concepts">Basic Concepts</a></li>
+
+
+
+	<li><a href="#expressions">Expressions</a></li>
+
+
+
+	<li><a href="#unary%20and%20binary%20operators">Unary and Binary Operators</a></li>
+
+
+
+	<li><a href="#statements">Statements</a></li>
+
+
+
+	<li><a href="#classes">Classes</a></li>
+
+
+
+	<li><a href="#programs">Programs</a></li>
+
+
+
+	<li><a href="#predefined%20classes">Predefined Classes</a></li>
+
+
+
+	<li><a href="#library%20classes">Library Classes</a></li>
+
+
+
+</ul>
+
+
+
+<h2><a name="introduction"></a>Introduction</h2>
+
+
+
+<p>GEL2 is an experimental general-purpose object-oriented programming language.&nbsp; 
+GEL2 is essentially a subset of C#, extended with an ownership-based type system 
+which allows GEL2 to free memory safely and deterministically without using a 
+garbage collector.</p>
+
+
+
+<p>The language is large enough to write useful programs, such as the GEL2 
+interpreter/compiler itself.&nbsp; The language is primarily intended to 
+demonstrate the viability of a type system based on ownership, and is missing a 
+number of features common in practical object-oriented languages including 
+interfaces, namespaces and exceptions.&nbsp; It would probably be relatively 
+straightforward to extend GEL2 to include such features.</p>
+
+
+
+<p>This document contains an overview and reference for the GEL2 language as 
+implemented today.&nbsp; </p>
+
+
+
+<p>The reference is relatively informal; if a feature is familiar from other 
+high-level object-oriented languages such as Java and C#, we will often 
+present it with minimal explanation.&nbsp; We do present a complete grammar 
+for GEL2, and we attempt to provide a reasonably complete description of the type 
+system and of type conversions, where GEL2's ownership types play a significant 
+role.</p>
+
+
+
+
+<h2><a name="overview: ownership"></a>Overview: Ownership</h2>
+
+
+
+<p>GEL2's type system includes the notion of <i>ownership</i>: GEL2 distinguishes <dfn>
+owning</dfn> and <dfn>non-owning</dfn> pointers.&nbsp; The type system ensures 
+that there is exactly one owning pointer to every object at any time.&nbsp; When 
+an owning pointer is destroyed, the object it points to is destroyed as well.&nbsp; 
+At run time, GEL2 keeps a count of non-owning pointers to each object.&nbsp; If a 
+destroyed object's non-owning pointer count is non-zero, then a run-time error 
+occurs and program execution terminates; it is the programmer's responsibility 
+to avoid this condition.</p>
+
+
+
+<p>Unlike languages with simple manual memory management schemes (such as 
+malloc/free or new/delete), GEL2 is <dfn>safe</dfn>: a bug in a GEL2 program can never 
+corrupt memory arbitrarily.&nbsp; Unlike garbage-collected languages, memory 
+management in GEL2 is <i>deterministic</i>: objects are freed as soon as they are 
+no longer needed, and user-written destructors run at predictable times.&nbsp; 
+Unlike traditional reference-counting schemes, GEL2 can free data structures 
+including <dfn>cycles</dfn> of pointers.&nbsp; GEL2's non-owning reference counts are also 
+cheaper than traditional reference counts for a number of reasons as described 
+<a href="#cost%20of%20reference%20counting">below</a>.&nbsp; </p>
+
+
+
+<p>A pointer's compile-time type indicates whether the pointer owns the object 
+it points to.&nbsp; At run time in a compiled GEL2 program, both owning and 
+non-owning pointers are represented as ordinary (typically 32-bit) pointers.</p>
+
+
+
+<p>Ownership of an object may <i>transfer</i> from one pointer to another as a 
+program runs.&nbsp; GEL2's type system ensures that the single-owner property holds 
+even as ownership of an object changes.</p>
+
+
+
+<p>GEL2 <i>destroys</i> an object o as follows.&nbsp; First GEL2 runs the user-written 
+destructor (if any) for o.&nbsp; Next GEL2 destroys all fields in o (in reverse 
+lexical order); if these fields point to other objects then those objects will 
+be destroyed as well.&nbsp; Finally GEL2 checks o's non-owning reference count.&nbsp; 
+If the reference count is non-zero, GEL2 issues a run-time error and terminates the 
+program; otherwise GEL2 frees the memory used to store o and continues execution.</p>
+
+
+
+<p>A simple example will illustrate how ownership works in data structures in GEL2.&nbsp; 
+Consider a doubly linked list:</p>
+
+
+
+<p><img src="linked_list.png" border="0"></p>
+
+
+
+<p>In the image above, solid arrows indicate owning pointers and dotted arrows 
+indicate non-owning pointers.&nbsp; <code>p</code> is a local variable pointing 
+to the head of the list.&nbsp; &Oslash; represents a <code>null</code> 
+pointer indicating the end of the list.</p>
+
+
+
+<p>Suppose that the method invocation containing <code>p</code> exits so that
+<code>p</code> goes out of scope.&nbsp; <code>p</code> owns <code>a</code>, so GEL2 
+will now destroy <code>a</code>.&nbsp; To do this, GEL2 will first run <code>a</code>'s user 
+destructor if any.&nbsp; Next GEL2 will destroy <code>b</code>; in the process of 
+destroying <code>b</code>, <code>c</code> will be destroyed, and so on.&nbsp; As
+<code>b</code> is destroyed, its non-owning pointer to <code>a</code> will be 
+destroyed and so <code>a</code>'s non-owning reference count will drop to zero.&nbsp; 
+After <code>b</code>'s destruction has completed, GEL2 will check that <code>a</code>'s 
+non-owning reference count is zero and will free the memory used to store <code>
+a</code>.</p>
+
+
+
+<p>As this example illustrates, GEL2 can automatically destroy data structures in 
+which parent nodes have owning pointers to children and child nodes have 
+non-owning pointers to parents.&nbsp; The destruction process works similarly 
+for more complex data structures such as trees.&nbsp; Note that a traditional 
+reference-counted system would be unable to free these structures.</p>
+
+
+
+<h3>Ownership types</h3>
+
+
+
+<p>In GEL2, the type <code>T ^</code> is an owning pointer to an object of type
+<code>T</code>.&nbsp; A type written without a <code>^</code> character indicates a 
+non-owning pointer.&nbsp; Local variables, parameters, method return values and 
+object fields may all have owning or non-owning types.</p>
+
+
+
+<p>Here's a minimal GEL2 program:</p>
+
+
+
+<pre>class Foo {<br>  public static void Main() {<br>    Foo ^f = new Foo();<br>  }<br>}</pre>
+
+
+
+<p>The <code>new</code> operator returns an owning pointer.&nbsp; In this 
+program, the local variable <code>f</code> receives ownership of the newly 
+allocated object.&nbsp; When <code>Main()</code> exits and <code>f</code> goes 
+out of scope, GEL2 destroys the object automatically.</p>
+
+
+
+<p>If an owning pointer is updated with a new value, any previously pointed-to 
+object is destroyed immediately.&nbsp; For example:</p>
+
+
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();   // allocates a new Foo<br>  f = new Foo();        // the first Foo allocated is destroyed here<br>  f = null;             // the second Foo allocated is destroyed here<br>  ...<br>}</pre>
+
+
+
+<p>Ownership may <dfn>transfer</dfn> between variables.&nbsp; For example:</p>
+
+
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^gel2 = f;	        // ownership transfers to GEL2<br>}</pre>
+
+
+
+<p>In GEL2 it is a compile-time error to read from any local variable 
+which may have lost ownership:</p>
+
+
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^gel2 = f;	        // ownership transfers to GEL2<br>  Foo h = f;            // error: f has lost ownership<br>}</pre>
+
+
+
+<p>A local variable may lose ownership and then receive ownership of a new 
+value.&nbsp; For example:</p>
+
+
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^gel2 = f;	        // ownership transfers to GEL2<br>  f = new Foo();<br>}</pre>
+
+
+
+<h3>Fields, methods and ownership</h3>
+
+
+
+<p>Object fields may have either owning or non-owning type.&nbsp; Here's a 
+definition in GEL2 for the doubly linked list class illustrated above, extended to 
+hold an integer in each node:</p>
+
+
+
+<pre>class Node {<br>  int i_;<br>  public Node ^next_;<br>  public Node prev_;<br>}</pre>
+
+
+
+<p>(Note that the trailing underscore in the field names above is not part of 
+GEL2's syntax; these fields follow Google's convention that field names end in 
+underscores.)</p>
+
+
+
+<p>Method parameters and return values may also have owning or non-owning type.&nbsp; 
+If a method parameter has owning type, the method <dfn>receives ownership </dfn>
+of the value passed in that parameter.&nbsp; If a return value has owning type, 
+the method <dfn>gives ownership</dfn> of the returned value back to the calling 
+method.&nbsp; To illustrate, let's add a constructor to the <code>Node</code> class above:</p>
+
+
+
+<pre>class Node {<br>  int i_;<br>  public Node ^next_;<br>  public Node prev_;</pre>
+
+
+
+<pre>  public Node(int i, Node ^n, Node p) { i_ = i; next_ = n; prev_ = p; }<br>}</pre>
+
+
+
+<p>Here's a method which takes an integer <code>k</code> and returns a doubly linked list 
+containing the integers 1 through <code>k</code>:</p>
+
+
+
+<pre>static Node ^IntList(int k) {<br>  Node ^n = null;<br>  for (int i = 1 ; i &lt;= k ; ++i) {<br>    Node o = n;  // keep a pointer to previous head of list<br>    n = new Node(i, n, null);<br>    if (o != null)<br>      o.prev_ = n;  // create backlink<br>  }<br>  return n;<br>}</pre>
+
+
+
+<p>In the line which calls the <code>new Node()</code> constructor, the owning 
+variable <code>n</code> first loses ownership of the object it points to, since 
+it passes that value to a constructor parameter with owning type: the 
+constructor takes ownership of the object passed.&nbsp; After the constructor 
+returns, <code>n</code> receives ownership of the newly allocated object.</p>
+
+
+
+<p>If we attempt to replace that line with</p>
+
+
+
+<pre>    n = new Node(i, o, null);</pre>
+
+
+
+<p>then we receive a compile-time error since an owning parameter must be passed 
+an owning value:</p>
+
+
+
+<pre>test.gel2(16): error: Node: the best overloaded constructor match has some invalid arguments<br>test.gel2(16): error: argument 2: can't convert from Node to Node ^</pre>
+
+
+
+<h3><a name="take"></a>The take operator</h3>
+
+
+
+<p>Let's extend the <code>Node</code> class with a method <code>Chop()</code> which chops all nodes 
+following <code>this</code> off the list and returns an owning pointer to them:</p>
+
+
+
+<pre>Node ^Chop() {<br>  if (next_ != null)<br>    next_.prev_ = null;<br>  return take next_;<br>}</pre>
+
+
+
+<p>The <code>take</code> operator takes ownership of a value from an owning 
+field.&nbsp; It has the side effect of setting the field's value to <code>null</code>, 
+which is necessary since the object being taken may have only a single owner.</p>
+
+
+
+<p>If an expression reads an owning field without using <code>take</code>, then 
+it receives a non-owning pointer.&nbsp; If we modify the <code>return</code> 
+statement above to be just</p>
+
+
+
+<pre>return next_;</pre>
+
+
+
+<p>then we receive a compile-time error:</p>
+
+
+
+<pre>test1.gel2(13): error: can't convert Node to Node ^</pre>
+
+
+
+<p>GEL2 could conceivably take ownership from and null out owning fields 
+automatically whenever they're read in an owning context; then the <code>take</code> 
+operator would be unnecessary.&nbsp; But then the side effect of nulling out a 
+field would be much less apparent to programmers; GEL2 includes <code>take</code> 
+so that this side effect is explicit.</p>
+
+
+
+<p>If <code>take</code> is applied to a pointer whose value is <code>null</code>, 
+then <code>take</code> returns <code>null</code> without error.</p>
+
+
+
+<p>Note that <code>take</code> is generally unnecessary when taking ownership 
+from owning local variables and parameters; in this situation ownership 
+transfers automatically and the local or parameter's value becomes undefined 
+(reading it yields a compile-time error as discussed above).&nbsp; If <code>take</code> 
+is used with a local variable, the variable's value is set to <code>null</code>:</p>
+
+
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^gel2 = f;        // ownership transfers to gel2; f is now undefined<br>  Foo ^h = take gel2;   // ownership transfers to h; gel2 is now null<br>}</pre>
+
+
+
+<h3>Circular data structures</h3>
+
+
+
+<p>It's possible for a GEL2 program to create cycles of owning pointers.&nbsp; The 
+following program creates two <code>Bar</code> objects which point to each 
+other:</p>
+
+
+
+<pre>class Bar {<br>  Bar ^next_;<br><br>  static void MakeACycle() {<br>    Bar ^n = new Bar();<br>    Bar ^o = new Bar();<br>    Bar p = o;<br>    n.next_ = o;<br>    p.next_ = n;<br>  }<br>}</pre>
+
+
+
+<p>These objects will never be destroyed.&nbsp; GEL2 only destroys structures 
+containing no owning pointer cycles; this is a weaker guarantee than that provided by 
+a garbage collector, which can destroy structures containing arbitrary pointer 
+cycles.</p>
+
+
+
+<p>But this hardly matters in practical programming.&nbsp; It's hard to create 
+an owning pointer cycle by mistake in GEL2, because the type system guarantees that 
+a programmer can't create an owning pointer cycle and return an owning pointer 
+to it.&nbsp; For example, if we modify the <code>MakeACycle</code> method above 
+to return a <code>Bar&nbsp;^</code> and add the line <code>return n;</code> at the 
+end of the method, we receive a compile-time error: we can't return <code>n</code> 
+because ownership has already transferred away from it (in the assignment to
+<code>p.next_</code>).</p>
+
+
+
+<p>All common data structures can be coded without using owning pointer cycles.&nbsp; 
+For inherently circular structures such as a circular linked list, the GEL2 
+programmer must store all list nodes in a non-circular owning pointer list, and 
+then either (a) create an additional circular set of non-owning pointers, or (b) 
+imitate circular behavior by jumping back to the head of the list whenever a 
+navigation past the end of the list is encountered.&nbsp; This is admittedly 
+unnatural in GEL2, but inherently circular structures form only a small fraction of 
+data structures encoutered in typical programs. </p>
+
+
+
+<h3>Object destruction order</h3>
+
+
+
+<p>When a block of GEL2 code (such as a method body) finishes executing, all 
+variables in the block are destroyed in reverse lexical order, i.e. in the 
+reverse of the order in which they appear in the program text.&nbsp; Similarly, 
+when a GEL2 object is destroyed, all fields in the object are destroyed in reverse 
+lexical order.&nbsp; This means that the order in which variables or fields 
+appear sometimes affects whether destruction will complete without error.&nbsp; 
+Consider the following class:</p>
+
+
+
+<pre>class Bar {<br>  public Bar next_;  // automatically initialized to null<br><br>  public static void Foo() {<br>    Bar ^b = new Bar();<br>    Bar ^c = new Bar();<br>    c.next_ = b;<br>  }<br>}</pre>
+
+
+
+<p>The <code>Foo</code> method will execute without error.&nbsp; Suppose that we 
+rewrite <code>Foo</code> as follows:</p>
+
+
+
+<pre>public static void Foo() {<br>  Bar ^c = new Bar();<br>  Bar ^b = new Bar();<br>  c.next_ = b;<br>}</pre>
+
+
+
+<p>The program will now terminate with a run-time error: GEL2 tries to destroy 
+<code>b</code> 
+first, but <code>b</code> cannot be freed since its non-owning pointer count is 1 (<code>c</code> still 
+points to it).</p>
+
+
+
+<p>Practically speaking, we've found that in most GEL2 programs objects are naturally 
+destroyed without error; only occasionally have we had to rearrange variables or 
+fields to ensure that destruction works properly.</p>
+
+
+
+<p>GEL2 can automatically destroy any data structure in which every non-owning 
+pointer from an object o points to an object which is an ancestor of o in the 
+object ownership tree.&nbsp; Many common data structures such as the doubly 
+linked list discussed above have this form.&nbsp; If a data structure contains 
+non-owning pointers to non-ancestor nodes, then the programmer must write code 
+to null out those pointers before the structure is destroyed.</p>
+
+
+
+<p>As an exception to the above, after a GEL2 program's <code>Main()</code> method finishes 
+executing GEL2 destroys all remaining objects en masse: they may contain arbitrary 
+non-owning pointers.&nbsp; This means that a GEL2 programmer doesn't need to worry 
+about the order in which global variables are destroyed.</p>
+
+
+
+<h3>Type casts</h3>
+
+
+
+<p>Type casts in GEL2 never affect whether a value is owned; a cast is always from 
+an owning type to an owning type or from an non-owning type to an non-owning 
+type.&nbsp; Syntactically, a cast is always written with a non-owning type, even 
+if the value it affects is owning.&nbsp; Thus:</p>
+
+
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Bar ^b = (Bar) f;  // f loses ownership to b here<br>}</pre>
+
+
+
+<p>The <code>is</code> and <code>as</code> operators in GEL2 are similarly always 
+written with non-owning types, even though they may operate on owning or non-owning values.</p>
+
+
+
+<p>Type casts don't affect whether a value is owned, but GEL2 implicitly 
+converts between owning and non-owning types in certain situations; see the 
+<a href="#conversions">Conversions</a> section in the reference below.</p>
+
+
+
+<h3>Autoboxing and ownership</h3>
+
+
+
+<p>GEL2 (like Java and C#) provides <dfn>autoboxing</dfn>: a simple value such an <code>int</code> 
+or <code>bool</code> may be stored in a variable holding an object.&nbsp; In GEL2, 
+a boxed value always has the owning type <code>object ^</code>.&nbsp; For 
+example:</p>
+
+
+
+<pre>void Fun() {<br>  object ^o = 7;     // ok<br>  object p = false;  // compile-time error: can't convert from bool to object<br>}</pre>
+
+
+
+<p>In an owning type <code>T ^</code>, <code>T</code> must not be a simple type; 
+the types <code>int ^</code> and <code>bool ^</code> do not exist in GEL2, for 
+example.&nbsp; An unboxing conversion must be explicit, and yields a simple 
+type:</p>
+
+
+
+<pre>void Fun() {<br>  object ^o = 7;<br>  int i = (int) o;<br>}</pre>
+
+
+
+<h3>Strings</h3>
+
+
+
+<p>Strings in GEL2 are not owned; the type <code>string ^</code> does not exist.&nbsp; 
+In a compiled GEL2 program, strings are internally reference counted; a string is 
+freed when its reference count reaches zero.</p>
+
+
+
+<p>We thought about making strings owned in GEL2, but strings are so common in 
+real-world programs that we thought it might burdensome for programmers to have 
+to worry about string ownership.&nbsp; There's no problem with using classical 
+reference counting for strings: they don't point to other objects so they can 
+never be involved in a pointer cycle.</p>
+
+
+
+<p>A <code>string</code> may be converted either to an <code>object ^</code>&nbsp; 
+or to an <code>object</code>:</p>
+
+
+
+<pre>void Fun() {<br>  object ^o = "a";  // ok<br>  object p = "b";   // ok<br>}</pre>
+
+
+
+<h3>this and ownership</h3>
+
+
+
+<p>In GEL2 <code>this</code> is always a non-owning pointer:</p>
+
+
+
+<pre>class Foo {<br>  static Foo ^f;<br>  ...<br>  void Fun() {<br>    f = this;   // compile-time error: can't convert from Foo to Foo ^<br>  }<br>}</pre>
+
+
+
+<h3>Arrays and ownership</h3>
+
+
+
+<p>In GEL2 an array may hold either owning or non-owning pointers:</p>
+
+
+
+<pre>void Fun() {<br>  Foo [] ^a = new Foo[5];      // an array of non-owning pointers to Foo objects<br>  Foo ^[] ^b = new Foo^[5];   // an array of owning pointers to Foo objects<br>  b[0] = new Foo();<br>  a[0] = b[0];<br>}</pre>
+
+
+
+<p>The <code>take</code> operator may operate on array elements:</p>
+
+
+
+<pre>void Fun() {<br>  Foo ^[] ^a = new Foo^[5];<br>  a[0] = new Foo();<br>  Foo ^f = take a[0];<br>}</pre>
+
+
+
+<p>There is no array covariance at all in GEL2 as of yet; this means that it's not 
+possible, for example, to write a method which can accept either a <code>Foo&nbsp;[]</code> or a <code>Foo&nbsp;^&nbsp;[]</code> 
+as a parameter.</p>
+
+
+
+<h3><a name="cost of reference counting"></a>The cost of reference counting</h3>
+
+
+
+<p>GEL2's reference counts are far cheaper than those in a 
+traditional reference-counted system, for three reasons:</p>
+
+
+
+<ol>
+
+
+
+	<li>GEL2 doesn't need to keep reference counts for owning pointers; an 
+	object's reference count doesn't change as it is passed from owner to owner.&nbsp; 
+	In a traditional reference-counting system, a reference count is kept for 
+	every single pointer to an object.</li>
+
+
+
+	<li>In GEL2, a reference count decrement is simply an integer decrement, which 
+	may well be a single instruction.&nbsp; A traditional system must check 
+	whether a reference count is zero after each decrement; in GEL2 this is 
+	unnecessary because ownership, not the reference count, determines when it's 
+	time to free an object.</li>
+
+
+
+	<li>We use ownership information to optimize away many reference counts at 
+	compile time in GEL2.&nbsp; In particular, if a block of code manipulates only 
+	non-owning pointers to an object, then it cannot possibly free that object; 
+	the compiler uses that information to its advantage in optimization.</li>
+
+
+
+</ol>
+
+
+
+<h2><a name="overview: allocation"></a>Overview: Memory Allocation</h2>
+
+
+
+<p>GEL2 allows a program to allocate objects in several different ways: on the 
+heap, from pools, on the stack, or embedded inside another object.</p>
+
+
+
+<h3>Pool allocation</h3>
+
+
+
+<p>GEL2 supports memory <dfn>pools</dfn>.&nbsp; A pool can allocate objects of any 
+type.&nbsp; Allocation from a pool is faster than allocating from the heap, but 
+pool-allocated objects cannot be destroyed individually: all objects in a pool 
+are destroyed en masse when the pool itself is destroyed.</p>
+
+
+
+<p>Like all other allocation mechanisms in GEL2, pools are safe.&nbsp; GEL2 destroys a 
+pool in two phases.&nbsp; In the first phase, GEL2 first destroys every object in 
+the pool in reverse allocation order; GEL2 does not check objects' reference counts 
+during this phase.&nbsp; In the second phase, GEL2 iterates over every destroyed 
+object and checks that its reference count is zero.&nbsp; Even when this 
+destruction process is taken into account, it is significantly faster to 
+allocate a number of objects from a pool and then destroy the pool than it is to 
+heap-allocate and destroy the same number of objects.</p>
+
+
+
+<p>Pools in GEL2 have type <code>pool</code>.&nbsp; A pool can be allocated using
+<code>new</code>:</p>
+
+
+
+<pre>pool ^p = new pool();</pre>
+
+
+
+<p>Objects can be allocated from a pool using the <code>new</code> operator:</p>
+
+
+
+<pre>Foo f = p.new Foo(3, 4);</pre>
+
+
+
+<p>Note that when allocating from a pool, <code>new</code> returns a non-owning 
+pointer: the pool itself owns the allocated object.&nbsp; This makes pools 
+especially convenient to use in GEL2: code that allocates objects from a pool can 
+manipulate those objects without using any ownership annotations whatsoever.</p>
+
+
+
+<h2><a name="running gel2"></a>Running GEL2</h2>
+
+
+
+<p>The GEL2 interpreter/compiler runs on Linux and on Windows.&nbsp; We've 
+only tested that GEL2 works on relatively recent&nbsp;Ubuntu releases and on 
+Windows XP.&nbsp; It should be straightforward to port GEL2 to other platforms.</p>
+
+
+
+<p>The interpreter/compiler consists of a single executable named&nbsp;<code>gel2</code> (on Linux) or <code>gel2.exe</code> 
+(on Windows):</p>
+
+
+
+<pre>% gel2<br>usage: gel2 &lt;source-file&gt; ... [args]<br>       gel2 -c [-d] [-o &lt;name&gt;] [-u] [-v] [-cpp] &lt;source-file&gt; ...<br><br>-c: compile to native executable<br>-d: debug mode: disable optimizations, link with debug build of C runtime<br>-o: specify output filename<br>-u: unsafe: skip reference count checks<br>-v: verbose: display command used to invoke C++ compiler<br>-cpp: compile to C++ only<br>%</pre>
+
+
+
+<p>To run a GEL2 program using the interpreter, simply pass its filename on the command 
+line:</p>
+
+
+
+<pre>% gel2 hello.gel2<br>hello world<br>%</pre>
+
+
+
+<h3>Compiling</h3>
+
+
+
+<p>To compile a GEL2 program to native code, use the <code>-c</code> flag:</p>
+
+
+
+<pre>% gel2 -c hello.gel2<br>% hello<br>hello world<br>%</pre>
+
+
+
+<p>A compiled GEL2 program should always produce the same output that the 
+interpreter does when run on the same program.&nbsp; We're currently aware of a 
+small number of bugs which may cause discrepancies in behavior between compiled 
+and interpreter programs; we hope to fix these soon.</p>
+
+
+
+<p>The GEL2 compiler works by generating C++ code, which it then feeds to the C++ 
+compiler.</p>
+
+
+On Linux, GEL2 invokes the GCC C++ compiler, which GEL2 currently looks for only at
+<code>/usr/bin/g++</code> .&nbsp; We've tested that GEL2 works with GCC 3.2 and 
+higher.
+<p>On Windows, GEL2 invokes 
+Microsoft's Visual C++ compiler, which GEL2 looks for in the following 
+locations:</p>
+
+
+
+<pre>c:\Program Files\Microsoft Visual Studio .NET 2002<br>c:\Program Files\Microsoft Visual Studio .NET 2003<br>c:\Program Files\Microsoft Visual Studio 8</pre>
+
+
+
+<p>At present GEL2 has been tested only with Visual Studio 2005; it may (or may 
+not) work with Visual Studio .NET 2002 or 2003.</p>
+
+
+
+<p>A GEL2 program may contain several source files:</p>
+
+
+
+<pre>% gel2 -c hello.gel2 hello2.gel2<br>% hello<br>hello world<br>%</pre>
+
+
+
+<p>The <code>-d</code> ("release") option tells the GEL2 compiler to compile in
+<dfn>debug mode</dfn>: the generated code will be unoptimized and will be linked with 
+the debug version of the C runtime library.</p>
+
+
+
+<p>The <code>-o</code> ("output") option specifies a base filename for the 
+output executable:</p>
+
+
+
+<pre>% gel2 -c -o zaza hello.gel2<br>% zaza<br>hello<br>%</pre>
+
+
+
+<p>The <code>-u</code> ("unsafe") option tells the GEL2 compiler not to keep 
+reference counts of non-owning pointers to each object.&nbsp; When a program is 
+built in unsafe mode, execution is slightly faster and memory usage is reduced, 
+but a bug may corrupt memory arbitrarily or cause the program to crash.&nbsp;
+<code>-u</code> skips only reference count checks; other safety checks such as 
+array bounds checks are currently active in GEL2 even when <code>-u</code> is specified.</p>
+
+
+
+<p>The <code>-v</code> ("verbose") option tells the GEL2 compiler to print the line 
+it uses to invoke the C++ compiler:</p>
+
+
+
+<pre>% gel2 -c -v test1.gel2<br>cl /nologo /MDd /Od /ZI test1.cpp user32.lib<br>%</pre>
+
+
+
+<p>On Windows, executables built with GEL2 depend only on the C run-time library 
+DLL (this is MSVCR80.DLL when compiling with Visual Studio 2005); no additional 
+GEL2 libraries or DLLs are needed at run time.&nbsp; A "hello, world" program built 
+in release mode on Windows currently generates an executable approximately 32K 
+in size.</p>
+
+
+
+<h2><a name="syntactic conventions"></a>Syntactic Conventions</h2>
+
+
+
+<p>We describe the syntax of GEL2 using a grammar.&nbsp; Non-terminal symbols are 
+in <i>italics</i>.&nbsp; Characters appearing literally in a program are in a
+<code>fixed-width font</code>.</p>
+
+
+
+<p>We define the set of productions for each non-terminal in the following way.&nbsp; 
+The non-terminal appears first, followed by a colon; each following line is 
+indented and contains a single production.&nbsp; Productions may be recursive: 
+the non-terminal being defined may appear in its own productions.</p>
+
+
+
+<p>If a non-terminal has many short productions, we may write ": one of" after 
+the non-terminal and list all productions on a single following indented line.&nbsp; 
+For example:</p>
+
+
+
+<p><i>foo</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>A B C</code></p>
+
+
+
+<p>is the same as</p>
+
+
+
+<p><i>foo</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>A</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>B</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>C</code></p>
+
+
+
+<p>When X is a non-terminal or terminal symbol,</p>
+
+
+
+<ul>
+
+
+
+	<li>X<sub>opt </sub>means zero or one occurrences of X.</li>
+
+
+
+	<li>X<sup>*</sup> means zero or more occurrences of X.</li>
+
+
+
+	<li>X<b><sup>+</sup></b> means one or more occurrences of X.</li>
+
+
+
+	<li>X<sup>*</sup><sub>list</sub> means zero or more occurrences of X, 
+	separated by comma characters.</li>
+
+
+
+	<li>X<b><sup>+</sup></b><sub>list</sub> means one or more occurrences of X, 
+	separated by comma characters.</li>
+
+
+
+</ul>
+
+
+
+<h2><a name="lexical structure"></a>Lexical Structure</h2>
+
+
+
+<p>A GEL2 source file consists of a series of ASCII characters.</p>
+
+
+
+<h3>Comments</h3>
+
+
+
+<p>GEL2 ignores <dfn>comments</dfn> in a source file.&nbsp; A single-line comment begins with 
+the characters <code>//</code> and extends to the next line terminator.&nbsp; A 
+block comment begins with the characters <code>/*</code> and extends to the the 
+next occurrence of the characters <code>*/</code> .&nbsp; A block comment may 
+contain multiple lines.&nbsp; Block comments do not nest.</p>
+
+
+
+<h3>Identifiers</h3>
+
+
+
+<p><i>letter</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; an ASCII character in the range A-Z or a-z</p>
+
+
+
+<p><i>digit</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>0 1 2 3 4 5 6 7 8 9</code></p>
+
+
+
+<p><i>underscore:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; _</i></p>
+
+
+
+<p><i>id-initial-char</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>letter</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>underscore</i></p>
+
+
+
+<p><i>id-char</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>letter</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>digit</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>underscore</i></p>
+
+
+
+<p><i>id</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>id-initial-char</i> <i>id-char</i><sup>*</sup></p>
+
+
+
+<p>An <dfn>identifier</dfn> is a sequence of letters, digits and/or underscores and may not 
+begin with a digit.</p>
+
+
+
+<h3>Keywords</h3>
+
+
+
+<p>The following <dfn>keywords</dfn> are reserved in GEL2 and may not be used as identifiers:</p>
+
+
+
+<p><code>abstract as base bool break case char class const continue default do 
+else extern false<br>
+
+
+
+for foreach if in int is new null object out override pool private protected public 
+readonly<br>
+
+
+
+ref return short static string switch take this true using virtual void while</code></p>
+
+
+
+<h3>Literals</h3>
+
+
+
+<h4>Boolean literals</h4>
+
+
+
+<p><i>boolean-literal</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>true</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>false</code></p>
+
+
+
+<h4>Integer literals</h4>
+
+
+
+<p><i>digit</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>0 1 2 3 4 5 6 7 8 9</code></p>
+
+
+
+<p><i>hex-digit</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F</code></p>
+
+
+
+<p><i>integer-literal</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>-</code><sub>opt</sub> <i>digit<sup><b>+<br>
+
+
+
+</b></sup></i>&nbsp;&nbsp;&nbsp; <code>0x</code> <i>hex-digit<sup><b>+<br>
+
+
+
+</b></sup></i>&nbsp;&nbsp;&nbsp; <code>0X</code> <i>hex-digit<b><sup>+</sup></b></i></p>
+
+
+
+<p>An integer literal must represent a 32-bit integer 
+i in the range -2<sup>31</sup> &lt;= i &lt; 2<sup>31</sup>; otherwise a compile-time 
+error results.</p>
+
+
+
+<h4>Floating-point literals</h4>
+
+
+
+<p><i>decimal-suffix</i>: <code>.</code> <i>digit<sup><b>+</b></sup></i></p>
+
+
+
+<p><i>sign: </i>one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>+ -</code></p>
+
+
+
+<p><i>exponent-part:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i><code>e</code> <i>sign<sub>opt</sub></i> <i>digit<sup><b>+</b></sup></i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>E</code> <i>sign<sub>opt</sub></i> <i>digit<sup><b>+</b></sup></i></p>
+
+
+
+<p><i>floating-point-suffix: </i>one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>F f D d</code></p>
+
+
+
+<p><i>floating-point-literal</i>: <i>digit</i><sup>*</sup> <i>decimal-suffix<sub>opt</sub></i>
+<i>exponent-part<sub>opt</sub></i> <i>floating-point-suffix<sub>opt</sub></i></p>
+
+
+
+<p>A <i>floating-point-literal</i> represents a literal <code>float</code> or
+<code>double</code> value, and must contain at least either a <i>decimal-suffix</i>, 
+an <i>exponent-part</i> or a <i>floating-point-suffix</i>.&nbsp; The suffixes
+<code>F</code> and <code>f</code> denote a value of type <code>float</code>;
+<code>D</code> and <code>d</code> denote a value of type <code>double</code>.&nbsp; 
+If no suffix is present, a floating-point literal is of type <code>double</code>.</p>
+
+
+
+<h4>Character literals</h4>
+
+
+
+<p><i>literal-char</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; any ASCII character other than <code>'</code> or <code>\</code></p>
+
+
+
+<p><i>escape-char</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>\' \" \\ \0 \n \r \t</code></p>
+
+
+
+<p><i>character-literal</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; ' <i>literal-char</i> '<br>
+
+
+
+&nbsp;&nbsp;&nbsp; ' <i>escape-char</i> '</p>
+
+
+
+<h4>String literals</h4>
+
+
+
+<p><i>string-char</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; any ASCII character other than <code>"</code> or <code>\</code></p>
+
+
+
+<p><i>string-char-def</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>string-char</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>escape-char</i></p>
+
+
+
+<p><i>string-literal</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; " <i>string-char-def</i><sup>*</sup> "</p>
+
+
+
+<h4>The null literal</h4>
+
+
+
+<p><i>null-literal</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>null</code></p>
+
+
+
+<h2><a name="types"></a>Types</h2>
+
+
+
+<p><i>predefined-type</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>bool char double float int object string pool</code></p>
+
+
+
+<p><i>concrete-type</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>predefined-type</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>id</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>type</i> <code>[]</code></p>
+
+
+
+<p><i>type</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>concrete-type</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>concrete-type</i> <code>^</code></p>
+
+
+
+<p><dfn>Types</dfn> in GEL2 include <dfn>concrete types</dfn> and <dfn>owning types</dfn>.</p>
+
+
+
+<p>Concrete types are arranged in a type hierarchy: every concrete type has a 
+parent type, with the exception of the <code>object</code> class and null type, 
+which have no parent types.&nbsp; A parent type is always a class type.&nbsp; We 
+say that T is <dfn>derived from</dfn> U, or that U is <dfn>a superclass of</dfn> 
+T, if either T's parent class is U or T's parent class is derived from U.</p>
+
+
+
+<p>Every <dfn>value</dfn> in GEL2 has some concrete type.&nbsp; A value V of type T is an <dfn>
+instance of</dfn> type U if T is U or if T is derived from U.&nbsp; Every value is 
+an instance of the <code>object</code> class, which forms the root of the type 
+hierarchy.</p>
+
+
+
+<p>A concrete type may have <dfn>members</dfn>, which include <dfn>fields</dfn>,
+<dfn>methods</dfn>, <dfn>
+constructors</dfn>, <dfn>
+destructors</dfn>,<dfn>
+properties</dfn>, and<dfn> indexers</dfn>.&nbsp; Every type <i>inherits</i> 
+the fields, methods, properties and indexers of its superclass: in many 
+situations the language behaves as if those members were defined in the type 
+itself.&nbsp; For more information about members, see the section
+<a href="#classes">Classes</a> below.</p>
+
+
+
+<p>Concrete types in GEL2 include <dfn>simple types</dfn> and <dfn>reference types</dfn>.&nbsp; 
+Simple types hold small immutable values.&nbsp; In a compiled GEL2 program, 
+variables with simple types contain values directly rather than holding pointers 
+to them; variables with reference types hold pointers to values&nbsp; Most reference types, 
+including user-defined class types and array types, are <dfn>owned</dfn>: every 
+instance of these types has a single owner.&nbsp; The string type is an unowned 
+reference type.</p>
+
+
+
+<p>Every concrete type has a <dfn>default value</dfn>.&nbsp; The default value 
+of every reference type is <code>null</code>.</p>
+
+
+
+<p>We generally use the term <dfn>object</dfn> to refer to instances of 
+reference types.</p>
+
+
+
+<h3>Simple types</h3>
+
+
+
+<p>Simple types are small and immutable.&nbsp; GEL2 defines three simple types
+<code>bool</code>, <code>int </code>and <code>char</code>.&nbsp; The superclass of every simple type is the <code>object</code> class.</p>
+
+
+
+<h4>bool</h4>
+
+
+
+<p>A <code>bool</code> holds either of the Boolean values <code>true</code> or
+<code>false</code> .&nbsp; The default value of <code>bool</code> is <code>false</code>.</p>
+
+
+
+<h4>int</h4>
+
+
+
+<p>An <code>int</code> is a signed 32-bit integer.&nbsp; The default value of
+<code>int</code> is 0.</p>
+
+
+
+<h4>float / double</h4>
+
+
+
+<p>A <code>float</code> is an IEEE 754 single-precision 32-bit floating number.&nbsp; 
+A <code>double</code> is an IEEE 754 double-precision 64-bit floating-point 
+number.&nbsp; A <code>float</code> or <code>double</code> may hold any of the 
+following values:</p>
+
+
+
+<ul>
+
+
+
+	<li><i>s</i> x <i>m</i> x 2<i><sup>e</sup></i>, where
+    
+    
+    <ul>
+
+
+
+		<li><i>s</i> is a sign bit: either +1 or -1</li>
+
+
+
+		<li><i>m</i>, the mantissa, is an integer in the range 0 &lt; <i>m</i> &lt; 2<sup>24</sup> 
+		(for a <code>float</code>) or 0 &lt; <i>m</i> &lt; 2<sup>53</sup> (for a <code>
+		double</code>)</li>
+
+
+
+		<li><i>e</i>, the exponent, is an integer in the range -149 &lt;= <i>e</i> 
+		&lt;= 104 (for a <code>float</code>) or -1075 &lt;= <i>e</i> &lt;= 970 (for a
+		<code>double</code>)</li>
+
+
+
+	
+    
+    
+    </ul>
+
+
+
+	</li>
+
+
+
+	<li>positive or negative 0</li>
+
+
+
+	<li>positive or negative infinity</li>
+
+
+
+	<li>NaN ("not a number")</li>
+
+
+
+</ul>
+
+
+
+<h4>char</h4>
+
+
+
+<p>A <code>char</code> is a 16-bit Unicode character.&nbsp; The default value of
+<code>char</code> is <code>'\0'</code>.</p>
+
+
+
+<h3>Class types</h3>
+
+
+
+<p>A class type is a reference type.&nbsp; GEL2 predefines a number of class types 
+including the <code>object</code> class, which is the root of the type 
+hierarchy.&nbsp; The user may define additional classes as described in the 
+Classes section below.</p>
+
+
+
+<h3>Array types</h3>
+
+
+
+<p>For every type T (including owning types) GEL2 defines the array 
+type T [] .&nbsp; An array type is a reference type.&nbsp; The 
+superclass of every array type is the built-in class <code>Array</code> ; the 
+superclass of Array is the <code>object</code> class.</p>
+
+
+
+<p>An array of type T [] holds a fixed-length array of variables of 
+type T .</p>
+
+
+
+<p>GEL2 does not (yet) implement any sort of array covariance; when T and U are 
+different types, there is no implicit or explict conversion between T [] and U [].</p>
+
+
+
+<h3>Strings</h3>
+
+
+
+<p>A <code>string</code> holds a string of 16-bit Unicode characters.&nbsp; 
+Strings are immutable.</p>
+
+
+
+<p><code>string</code> is a reference type.&nbsp; The superclass of the <code>string</code> 
+class is the <code>object</code> 
+class.</p>
+
+
+
+<p>In a compiled GEL2 program, strings are internally reference counted; creating a 
+new reference to a string is a fast operation whose cost is independent of the 
+length of the string.&nbsp; A string's reference count is not visible to the GEL2 
+programmer.&nbsp; A string is freed when its reference count reaches zero.&nbsp; 
+Strings are the only type in GEL2 which are reference counted in this way.</p>
+
+
+
+<h3>Pools</h3>
+
+
+
+<p>A <code>pool</code> holds a set of objects which cannot be destroyed 
+individually: they are destroyed en masse when the pool itself is destroyed.</p>
+
+
+
+<p><code>pool</code> is a reference type.&nbsp; The superclass of the <code>pool</code> 
+class is the <code>object</code> class.</p>
+
+
+
+<h3>Null type</h3>
+
+
+
+<p>The null type holds the single value <code>null</code> , which is an instance 
+of every reference type.&nbsp; GEL2 provides no syntax for indicating the null 
+type, and a variable's type may never be the null type.</p>
+
+
+
+<h3>Owning types</h3>
+
+
+
+<p>For every class and array type T, GEL2 defines the owning type T 
+^.&nbsp; An owning type is a reference type.</p>
+
+
+
+<h2><a name="basic concepts"></a>Basic Concepts</h2>
+
+
+
+<h3><a name="variables and locations"></a>Variables</h3>
+
+
+
+<p>A <dfn>variable</dfn> holds a value in a GEL2 program.&nbsp; GEL2 defines several 
+kinds of variables including local variables, method parameters, object fields 
+and array elements.&nbsp;</p>
+
+
+
+<p>Every variable has a type.&nbsp; At run time, a variable of type <code>T</code> 
+or <code>T ^</code> always holds an instance of type <code>T</code>.</p>
+
+
+
+<p>A variable with an owning type T ^ <dfn>owns</dfn> the value it contains; 
+when such a variable is destroyed, GEL2 destroys the contained value as well.&nbsp; 
+GEL2's type system ensures at compile time that every object always has exactly one 
+owner.&nbsp; Given this, objects in a GEL2 program form an <dfn>ownership tree</dfn>: 
+the roots of the tree are static variables and local variables and parameters in 
+each stack frame, and objects in the tree are linked through pointers from 
+owning object fields.</p>
+
+
+
+<h4>Definite assignment</h4>
+
+
+
+<p>GEL2 ensures that no program will ever read from an uninitialized variable.&nbsp; 
+It is a compile-time error to read from a local variable which may not have yet 
+been assigned a value.&nbsp; When a new object is created, every object field is 
+initialized with a default value appropriate for the field's type before the 
+object's constructor runs.&nbsp; When a new array is allocated, every array 
+element is initialized with a default value.</p>
+
+
+
+<h3><a name="conversions"></a>Conversions</h3>
+
+
+
+<p>GEL2 defines two kinds of type conversions: <dfn>implicit</dfn> and <dfn>explicit
+</dfn>conversions.</p>
+
+
+
+<h4><a name="implicit conversions"></a>Implicit conversions</h4>
+
+
+
+<p>GEL2 performs implicit conversions in many contexts including assigning to any 
+variable, passing a value as a method argument and returning a value from a 
+method.&nbsp; An implicit conversion will always succeed at run time.</p>
+
+
+
+<p>Certain implicit conversions are allowed only in certain contexts. An <dfn>
+argument conversion context</dfn> occurs when GEL2 converts a method or indexer argument to 
+its corresponding parameter type.&nbsp; A <dfn>local assignment context</dfn> 
+occurs when GEL2 performs an assignment from a local expression (see
+<a href="#simple%20assignment">Simple assignment</a>, below).</p>
+
+
+
+<p>The following rules determine when an implicit conversion is possible between 
+types.</p>
+
+
+
+<p>Every type T is implicitly convertible to itself.</p>
+
+
+
+<p><code>char</code> is implicitly convertible to <code>int</code>.</p>
+
+
+
+<p><code>int</code> is implicitly convertible to <code>float</code> or <code>
+double</code>.&nbsp; (Note that a conversion from <code>int</code> to <code>
+float</code> may lose some precision, since not all 32-bit integers are 
+precisely representable in a <code>float</code>.)</p>
+
+
+
+<p>If a class or array type T is derived from a type U, then T is implicitly 
+convertible to U.</p>
+
+
+
+<p>The null type is implicitly convertible to any reference type (including 
+owning reference types).</p>
+
+
+
+<p>T ^ is implicitly convertible to U ^ if T is implicitly convertible to U.</p>
+
+
+
+<p>In an argument conversion or local assignment context, T ^ is implicitly 
+convertible to U if T is implicitly convertible to U.&nbsp; (In other words, GEL2 
+allows a source value to keep ownership in these contexts.)</p>
+
+
+
+<p>Any simple type is implicitly convertible to <code>object ^</code>.&nbsp; In 
+an argument conversion context, any simple type is also implicitly convertible 
+to <code>object</code>.&nbsp; These conversions are known as <dfn>boxing 
+conversions</dfn>.&nbsp; In a compiled GEL2 program, a boxing conversion allocates 
+a boxed object instance.</p>
+
+
+
+<p><code>string</code> is implicitly convertible to <code>object ^</code>&nbsp; 
+and to <code>object</code> .</p>
+
+
+
+<h4>Explicit conversions</h4>
+
+
+
+<p>GEL2 performs explicit conversions in evaluating cast expressions, <code>is</code> 
+and <code>as</code> expressions and <code>foreach</code> statements.&nbsp; An 
+explicit conversion may fail at run time; if it does, GEL2 will report an error and 
+terminate program execution.&nbsp; The following rules determine when an 
+explicit conversion is possible between types.</p>
+
+
+
+<h5>Explicit numeric conversions</h5>
+
+
+
+<p><code>int</code> is explicitly convertible to <code>char</code>.</p>
+
+
+
+<p><code>float</code> is explicitly convertible to <code>int</code>.</p>
+
+
+
+<p><code>double</code> is explicitly convertible to <code>float</code> or <code>
+int</code>.</p>
+
+
+
+<p>In an explicit conversion from <code>float</code> or <code>double</code> to
+<code>int</code>, let <code>i</code> be the nearest integer to the <code>float</code> 
+or <code>double</code>'s value, rounding toward zero.&nbsp; Then if <code>i</code> 
+is a valid 32-bit integer, then the result of the conversion is <code>i</code>; 
+otherwise the conversion yields an undefined integer value.</p>
+
+
+
+<p>In an explicit conversion from a <code>double</code> <i>d</i> to a <code>
+float</code>, if <i>d</i> is too large or too small to represent as a <code>
+float</code> then the conversion yields Infinity or -Infinity.&nbsp; Otherwise, 
+the conversion yields the <code>float</code> value nearest to d.</p>
+
+
+
+<h5>Other explicit conversions</h5>
+
+
+
+<p>If T is implicitly convertible to U, then T is explicitly convertible to U.</p>
+
+
+
+<p>If a class or array type T is derived from a type U, then U is explicitly 
+convertible to T.&nbsp; This conversion will fail if the source value is not an 
+instance of T.</p>
+
+
+
+<p>T ^ is explicitly convertible to U ^ if T is explicitly convertible to U.</p>
+
+
+
+<p><code>object</code> and <code>object ^</code> are explicitly convertible to 
+any simple type T; this is known as an <dfn>unboxing conversion</dfn>.&nbsp; 
+This conversion will fail if the source value is not actually an instance of T.</p>
+
+
+
+<p><code>object</code> and <code>object ^</code> are explicitly convertible to
+<code>string</code>.&nbsp; This conversion will fail if the source value is not 
+actually a string.</p>
+
+
+
+<h3>Member access</h3>
+
+
+
+<p>In a GEL2 class, members other than destructors may be either <code>private</code>, <code>protected</code> 
+or <code>public</code>.&nbsp; <code>private</code> members of a class may only 
+be accessed from within the class itself.<code> protected</code> members of a class may be 
+accessed only from within the class and its subclasses.&nbsp; By default a 
+member is <code>private</code>.</p>
+
+
+
+<h3>Applicable methods and indexers</h3>
+
+
+
+<p>A constructor or method M is <dfn>applicable</dfn> to a set of argument types A<sub>1</sub> 
+through A<sub>n</sub> if M has n parameters and if every argument type 
+A<sub>i</sub> is implicitly convertible to M's corresponding parameter 
+type P<sub>i </sub>in an argument conversion context (see
+<a href="#implicit%20conversions">Implicit conversions,</a> above).</p>
+
+
+
+<p>An indexer is applicable to an argument type A if A is implicitly convertible 
+to the indexer's parameter type in an argument conversion context.</p>
+
+
+
+<h3><a name="member lookup"></a>Member lookup</h3>
+
+
+
+<p>In various contexts GEL2 needs to look up a member of a type by name; this 
+process is called a <dfn>member lookup</dfn>.&nbsp; Member lookup happens at 
+compile time.</p>
+
+
+
+<p>Methods, constructors and indexers in GEL2 can be <dfn>overloaded</dfn>; member lookup chooses 
+a particular overload to be used for a method, constructor or indexer invocation.&nbsp; In GEL2 
+overload resolution must be <dfn>unambiguous</dfn>: there must be only one 
+accessible member which is applicable to the set of arguments in an invocation, 
+or a compile-time error results.</p>
+
+
+
+<p>Formally, to perform a member lookup in a type T for a field or property with 
+name <i>id</i>, GEL2 iterates over T and its superclasses in turn, checking each 
+class for an accessible field or property named <i>id</i>; as soon as any is 
+found, the member lookup is complete.</p>
+
+
+
+<p>Formally, to perform a member lookup in a type T for a method, constructor or indexer with name
+<i>id</i> applicable to a set A of argument types, GEL2 
+iterates over T and its superclasses in turn (for methods and indexers) or looks 
+just in class T (for constructors), checking each class for an accessible, non-<code>override</code> 
+member applicable to the given argument types.&nbsp; Exactly one such member 
+must exist; otherwise a compile-time error results.</p>
+
+
+
+<h2><a name="expressions"></a>Expressions</h2>
+
+
+
+<p><i>primary</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>(</code><i> expression </i><code>)</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>literal</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>l-value</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>invocation-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>post-increment-expression</i> <br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>post-decrement-expression</i> <br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>this</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>object-creation-expression</i> <br>
+
+
+
+<i>&nbsp;&nbsp;&nbsp; array-creation-expression</i></p>
+
+
+
+<p><i>unary</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>primary</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>pre-increment-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>pre-decrement-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>cast-expression</i> <br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>take-expression<br>
+
+
+
+&nbsp;&nbsp;&nbsp; unary-operator-expression</i> </p>
+
+
+
+<p><i>expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>unary</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>simple-assignment<br>
+
+
+
+&nbsp;&nbsp;&nbsp; compound-assignment<br>
+
+
+
+</i>&nbsp;&nbsp;&nbsp; <i>conditional-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>is-expression</i> <br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>as-expression</i><br>
+
+
+
+<i>&nbsp;&nbsp;&nbsp; binary-operator-expression</i>&nbsp; </p>
+
+
+
+<h3>Operator precedence</h3>
+
+
+
+<p>Operators in GEL2 have the following precedence, from highest to lowest:</p>
+
+
+
+<p><code>* / %<br>
+
+
+
++ -<br>
+
+
+
+&lt;&lt; &gt;&gt;<br>
+
+
+
+&lt; &gt; &lt;= &gt;= is as<br>
+
+
+
+&amp;<br>
+
+
+
+|<br>
+
+
+
+== !=<br>
+
+
+
+&amp;&amp;<br>
+
+
+
+||<br>
+
+
+
+? :<br>
+
+
+
+= *= /= %= += -= &amp;= |=</code></p>
+
+
+
+<p>Operators on the same line have the same precedence.&nbsp; The ? : and 
+assignment operators are right-associative; all other operators are 
+left-associative.</p>
+
+
+
+<p>Note that the <code>&amp;</code> and <code>|</code> operators have higher 
+precedence than <code>==</code> and <code>!=</code> (unlike in C, Java and C#).</p>
+
+
+
+<h3>Order of evaluation</h3>
+
+
+
+<p>GEL2 specifes a well-defined <i>order of evaluation</i> for every expression (as 
+it does for every construct in a single-threaded program).&nbsp;&nbsp; Unless 
+otherwise specified below, all immediate subexpressions of every expression are 
+evaluated in lexical order.&nbsp; This means, for example, that in a method 
+invocation of the form</p>
+
+
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;<i>primary</i> <code>.</code> <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
+<code>)</code></p>
+
+
+
+<p>the <i>primary</i> is first evaluated to produce an <i>l-value</i>, then each 
+argument in turn is evaluated from left to right, and finally the method 
+invocation is performed.</p>
+
+
+
+<p><i>The current GEL2 implementation does not respect this well-defined evaluation 
+order; currently the order of evaluation in a compiled GEL2 program depends on the 
+(ill-defined) order in which the C++ compiler chooses to evaluate constructs in 
+the generated C++ code.</i></p>
+
+
+
+<h3>Literals</h3>
+
+
+
+<p><i>literal</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>bool-literal</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>int-literal</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>char-literal</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>string-literal</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>null-literal</i></p>
+
+
+
+<p>A literal <code>bool</code>, <code>int</code>, <code>char</code>, <code>
+string</code> or <code>null</code> value may appear inside an expression.</p>
+
+
+
+<h3>L-values</h3>
+
+
+
+<p><i>l-value</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>simple-name</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>member-access</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>index-access</i></p>
+
+
+
+<p>There are three kinds of <i>l-values</i> in GEL2:</p>
+
+
+
+<ul>
+
+
+
+	<li>simple names</li>
+
+
+
+	<li>member accesses of the form <i>expression </i>. <i>id</i></li>
+
+
+
+	<li>index accesses of the form <i>expression </i><code>[</code> <i>expression</i>
+	<code>]</code></li>
+
+
+
+</ul>
+
+
+
+<p>An l-value may appear as a standalone expression or as part of other constructs 
+-- for example, on the left-hand side of an assignment statement, as a <code>ref</code> 
+or <code>out</code> argument in a method invocation, or in a <code>take</code> 
+expression.</p>
+
+
+
+<p>An l-value evaluates at run time to a <i>location</i>,<i> </i>which is a more 
+general notion than a variable: a location is either a variable, a property or 
+an <dfn>indexer access</dfn>, which is an indexer on some object along with an 
+argument to pass to the indexer.&nbsp; The kind of location which a particular l-value evaluates to 
+and the type of that location are always known at compile time.</p>
+
+
+
+<h4>Simple names</h4>
+
+
+
+<p><i>simple-name</i>: <i>id</i></p>
+
+
+
+<p>A <i>simple name</i> refers to any of the following:</p>
+
+
+
+<ul>
+
+
+
+	<li>a local variable or 
+parameter</li>
+
+
+
+	<li>an instance field or instance property of <code>this</code></li>
+
+
+
+	<li>a static field or static property of the enclosing class</li>
+
+
+
+	<li>a class (only possible when the <i>simple-name</i> is the <i>primary</i> 
+	expression in a <i>member-access</i> or <i>invocation-expression</i>)</li>
+
+
+
+</ul>
+
+
+
+<p>At compile time, GEL2 first looks for a local variable or parameter in scope 
+with name <i>id</i>.&nbsp; If no local or parameter is found, GEL2 performs a 
+<a href="#member%20lookup">member lookup</a> in the 
+enclosing class for a field or property with name <i>id</i>.&nbsp; If none is 
+found,&nbsp;and the <i>simple-name</i> is the <i>primary</i> expression of a <i>
+member-access</i> or <i>invocation-expression</i>, then GEL2 looks for a class with 
+name <i>id</i>.</p>
+
+
+
+<h4>Member access: the . operator</h4>
+
+
+
+<p><i>member-access</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>primary</i> . <i>id<br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i><code>base</code><i> . id</i></p>
+
+
+
+<p>A <dfn>member access</dfn> refers to an instance field or 
+property or to a static field or property.&nbsp; In the static case, <i>primary</i> 
+is a <i>simple-name</i> naming the class containing the field or property.</p>
+
+
+
+<h4>Index access: the [] operator</h4>
+
+
+
+<p><i>index-access</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>primary</i> <code>[</code> <i>expression</i> <code>]<br>
+
+
+
+&nbsp; base [</code> <i>expression</i> <code>]</code> </p>
+
+
+
+<p>A <dfn>index access</dfn> refers to an array element or an 
+indexer access.</p>
+
+
+
+<h3>Method invocation</h3>
+
+
+
+<p><i>argument:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; expression<br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i><code>ref</code><i> l-value<br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i><code>out</code><i> l-value</i></p>
+
+
+
+<p><i>invocation-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
+<code>)</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;<i>primary</i> <code>.</code> <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
+<code>)</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>base .</code> <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
+<code>)</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>predefined-type</i> <code>.</code> <i>id</i> <code>(</code> <i>
+argument*<sub>list</sub></i> <code>)</code></p>
+
+
+
+<p>An <i>invocation-expression</i> invokes an instance method or static method.&nbsp; 
+At compile time, GEL2 performs a <a href="#member%20lookup">member lookup</a> to find 
+a method M applicable to the given argument list.</p>
+
+
+
+<h3><a name="simple assignment"></a>Simple assignment</h3>
+
+
+
+<p><i>simple-assignment:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; l-value</i> <code>=</code> <i>expression</i></p>
+
+
+
+<p>A <i>simple assignment</i> assigns a new value to a location.</p>
+
+
+
+<p>In GEL2, the rules for type checking simple assignments depend on the form of 
+the <i>expression</i> being assigned.&nbsp; We define a <i>local expression</i> 
+to be any expression in which every simple-name refers to a local variable or 
+parameter, and which can be produced using the following grammar:</p>
+
+
+
+<p><i>local-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>simple-name</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>(</code> <i>type</i> <code>)</code> <i>local-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>local-expression</i> <code>as</code> <i>type</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>expression</i> <code>?</code> <i>local-expression</i>
+<code>:</code> <i>local-expression</i></p>
+
+
+
+<p>If the <i>expression </i>in a <i>simple-assignment </i>is a local expression, 
+then the assignment is type checked in a local assignment context as discussed 
+in <a href="#implicit%20conversions">Implicit conversions</a>, above; then the 
+assignment may be valid even if the expression has an owning type but the <i>
+l-value</i> being assigned to does not.&nbsp; If the <i>expression</i> is not a 
+local expression, then the assignment is type checked using the standard 
+implicit conversion rules.</p>
+
+
+
+<h3>Compound assignment</h3>
+
+
+
+<p><i>compound-operator</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>*= /=</code> <code>%=</code> 
+<code>+=</code> <code>-=</code> <code>&amp;=</code> <code>|=</code></p>
+
+
+
+<p><i>compound assignment</i>:<br>
+
+
+
+<i> &nbsp;&nbsp;&nbsp; l-value compound-operator expression</i></p>
+
+
+
+<h3>++/-- operators</h3>
+
+
+
+<p> <i>pre-increment-expression:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i><code>++</code> <i>l-value</i></p>
+
+
+
+<p> <i>pre-decrement-expression:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i><code>--</code> <i>l-value</i></p>
+
+
+
+<p> <i>post-increment-expression:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; l-value </i><code>++</code></p>
+
+
+
+<p> <i>post-decrement-expression:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; l-value </i><code>--</code></p>
+
+
+
+<p> The <code>++</code> and <code>--</code> operators may be applied only to an
+<i>l-value</i> of type <code>int</code> .</p>
+
+
+
+<h3>The ?: operator</h3>
+
+
+
+<p><i>conditional-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>expression</i> ? <i>expression</i> : <i>expression</i></p>
+
+
+
+<p>In the expression <code>e ? f : gel2</code>, let T<sub>f</sub> and T<sub>gel2</sub> 
+be the types of <code>f</code> and <code>gel2</code>, respectively.&nbsp; Then T<sub>f
+</sub>and T<sub>gel2</sub> must be either both owning or both non-owning; otherwise 
+a compile-time error occurs.&nbsp; If T<sub>f</sub> is implicitly convertible to 
+T<sub>gel2</sub>, then the type of the conditional-expression is T<sub>gel2</sub>.&nbsp; 
+Otherwise, if T<sub>gel2</sub> is implicitly convertible to T<sub>f</sub>, then 
+type of the conditional-expression is T<sub>f</sub>.&nbsp; Otherwise a 
+compile-time error occurs.</p>
+
+
+
+<h3>this</h3>
+
+
+
+<p><code>this</code> evaluates to the object on which the currently executing 
+method was invoked.&nbsp; It may not appear in a static context.</p>
+
+
+
+<p>Inside a method defined inside class C, <code>this</code> has 
+(the non-owning) type C.&nbsp; </p>
+
+
+
+<h3>base</h3>
+
+
+
+<p>The keyword <code>base</code> may appear on the left-hand side of a <i>member-access, index-access </i>
+or <i>invocation-expression</i>.&nbsp; <code>base</code> is used in a <code>
+virtual</code> method, property, or indexer to invoke the base class's 
+implementation of the same method, property, or indexer.</p>
+
+
+
+<p>More formally, a method, property or indexer invocation through <code>base</code> 
+is exactly the same as an invocation through <code>this</code>, except that</p>
+
+
+
+<ul>
+
+
+
+	<li>the compile-time member lookup for the method, property, or indexer is 
+	performed in the superclass of the enclosing class</li>
+
+
+
+	<li>the member invoked at run time is always the same one found at compile 
+	time, even if the member is <code>virtual</code> .</li>
+
+
+
+</ul>
+
+
+
+<h3>Type casts</h3>
+
+
+
+<p><i>cast-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>(</code> <i>concrete-type</i> <code>)</code> <i>unary</i></p>
+
+
+
+<p>A <dfn>type cast</dfn> performs an explicit conversion as described in the 
+section <a href="#conversions">Conversions</a>, above.&nbsp; If the conversion 
+fails, a run-time error occurs and the program is terminated.</p>
+
+
+
+<h3>The is operator</h3>
+
+
+
+<p><i>is-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>expression</i> <code>is</code> <i>concrete-type</i></p>
+
+
+
+<p><code>e is T</code> performs a run-time type check: it evaluates to <code>true</code> if 
+<code>e</code> is an instance of type <code>T</code>.&nbsp; For example:</p>
+
+
+
+<pre>class Foo { ... }<br>class Bar : Foo { ... }</pre>
+
+
+
+<pre>void Fun() {<br>  object ^o = new Foo();<br>  Console.WriteLine(o is Foo);	// writes True<br>  Console.WriteLine(o is Bar);  // writes False<br>}</pre>
+
+
+
+<p><code>e is T</code> evaluates to <code>false</code> if <code>e</code> is <code>null</code>.</p>
+
+
+
+<h3>The as operator</h3>
+
+
+
+<p><i>as-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>expression</i> <code>as</code> <i>concrete-type</i></p>
+
+
+
+<p>The expression<code> e as T</code> has type <code>T</code>, and performs a 
+run-time type check: it evaluates to <code>e</code> if <code>e</code> is an 
+instance of type <code>T</code>, and otherwise evaluates to <code>null</code>.&nbsp; 
+For example:</p>
+
+
+
+<pre>class Foo { ... }<br>class Bar : Foo { ... }</pre>
+
+
+
+<pre>void Fun() {<br>  object ^o = new Foo();<br>  Foo f = o as Foo;  // sets f to o<br>  Bar b = o as Bar;  // sets b to null<br>}</pre>
+
+
+
+<h3>new</h3>
+
+
+
+<p><i>object-creation-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp;&nbsp; <code>new</code> <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
+<code>)<br>
+
+
+
+</code>&nbsp;&nbsp;&nbsp; <i>primary</i><code> </code><samp>. </samp> <code>new</code> <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
+<code>)</code> </p>
+
+
+
+<p><i>array-creation-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>new</code> <i>type</i> <code>[</code> <i>expression</i> <code>]</code></p>
+
+
+
+<p>An <i>object-creation-expression</i> creates a new object.&nbsp; The <i>id</i> 
+in an <i>object-creation-expression</i> must name some class C.&nbsp; At compile time, GEL2 performs a <a href="#member%20lookup">member lookup</a> in C for a constructor 
+applicable to the given argument list.&nbsp; At run time, GEL2 allocates a new 
+object of type C and invokes the constructor to initialize it.</p>
+
+
+
+<p>The first form above performs a heap allocation; the <i>object-creation-expression </i>
+has the owning pointer type C ^ .&nbsp; In the second form above, the <i>object-creation-expression </i>
+contains a <dfn>primary</dfn> expression of type <code>pool</code> indicating a 
+pool to use for the allocation; in this case, the object creation returns a 
+non-owning pointer of type C.</p>
+
+
+
+<p>The <i>array-creation-expression</i> <code>new T [ e ]</code> has type <code>
+T [] ^</code> .&nbsp; The expression creates a new array with <code>e</code> 
+elements and returns an owning pointer to it.&nbsp; Every element in the array 
+is initialized with <code>T</code>'s default value.</p>
+
+
+
+<p>Note that GEL2's syntax for allocating an array of arrays is different from Java 
+and C#.&nbsp; Compare the following statements.</p>
+
+
+
+<pre>int [][] a = new int[4][];    // Java, C#</pre>
+
+
+
+<pre>int [][] ^a = new int[][4];   // GEL2</pre>
+
+
+
+<p><i>At the moment GEL2 implements the Java/C#-style array allocation syntax, and 
+can't allocate an array whose elements are owning arrays, e.gel2. an array of type
+</i><code>int&nbsp;[]&nbsp;^ []</code><i>.&nbsp; This is a bug.</i></p>
+
+
+
+<h3>The take operator</h3>
+
+
+
+<p><i>take-expression</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>take</code> <i>l-value</i></p>
+
+
+
+<p>The <code>take</code> operator takes ownership from a variable.&nbsp; It must 
+be applied to an variable with owning pointer type.&nbsp; <code>take</code> sets 
+a variable's value to <code>null</code>, and returns an owning pointer to the 
+object previously held in the variable.</p>
+
+
+
+<p>For more information, see the section <a href="#take">The take operator</a> 
+in the overview above.</p>
+
+
+
+<h2><a name="unary and binary operators"></a>Unary and Binary Operators</h2>
+
+
+
+<p><i>unary-operator</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>- ! ~</code></p>
+
+
+
+<p><i>unary-operator-expression:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i>&nbsp;&nbsp;&nbsp; <i>unary-operator</i> <i>unary</i></p>
+
+
+
+<p><i>binary-operator</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>* / % + - &lt;&lt; &gt;&gt; &lt; &gt; &lt;= &gt;= == != &amp; | &amp;&amp; ||</code></p>
+
+
+
+<p><i>binary-operator-expression:</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>expression binary-operator expression</i></p>
+
+
+
+<p>GEL2 includes a number of unary and binary <i>operators</i>, which may take 
+arguments of the built-in types <code>object</code>, <code>bool</code>, <code>
+double</code>, <code>
+float</code>, <code>
+int</code> and <code>string</code>.&nbsp; Some operators are <dfn>overloaded</dfn>: 
+they have several definitions which take different argument types.&nbsp; GEL2 
+always chooses a particular operator overload at compile time.</p>
+
+
+
+<p>Operator 
+invocations may potentially be ambiguous; for example, in the expression <code>
+"xyz" == "abc"</code> the overloads <i>object</i> == <i>object</i> and <i>string</i> 
+== <i>string</i> are both applicable.&nbsp; GEL2 resolves an ambiguous operator 
+invocation by choosing the <dfn>most specific</dfn> applicable overload, where an overload 
+O<sub>1</sub> is more specific than an overload O<sub>2</sub> if some argument type in O<sub>1</sub> is 
+implicitly convertible to the corresponding argument type in O<sub>2</sub>.&nbsp; 
+Given the operator definitions below, a single most specific overload will 
+always exist for any operator invocation.</p>
+
+
+
+<h3>Object equality</h3>
+
+
+
+<p><i>object</i> == <i>object</i></p>
+
+
+
+<p>The object equality operator returns true if its arguments are the same 
+object.&nbsp; In a compiled GEL2 program, this operator is implemented using a 
+simple pointer comparison.</p>
+
+
+
+<p>Boxing a simple value yields a unique object: <code>(object) 3 == (object) 3</code> 
+evaluates to false.</p>
+
+
+
+<h3>Boolean operators</h3>
+
+
+
+<h4>Boolean equality</h4>
+
+
+
+<p><i>bool</i> <code>==</code> <i>bool</i></p>
+
+
+
+<h4>Logical negation (!)</h4>
+
+
+
+<p><code>!</code> <i>bool</i></p>
+
+
+
+<h4>Conditional logical operators: &amp;&amp; and ||</h4>
+
+
+
+<p><i>bool</i> <code>&amp;&amp;</code> <i>bool</i></p>
+
+
+
+<p><i>bool</i> <code>||</code> <i>bool</i></p>
+
+
+
+<h4>Logical operators: &amp; and |</h4>
+
+
+
+<p><i>bool</i> <code>&amp;</code> <i>bool</i></p>
+
+
+
+<p><i>bool</i> <code>|</code> <i>bool</i></p>
+
+
+
+<h3>Integer operators</h3>
+
+
+
+<h4>Integer comparison</h4>
+
+
+
+<p><i>int</i> <code>==</code> <i>int<br>
+
+
+
+int </i><code>!=</code><i> int<br>
+
+
+
+int </i><code>&lt;</code><i> int<br>
+
+
+
+int </i><code>&gt;</code><i> int<br>
+
+
+
+int </i><code>&lt;=</code><i> int<br>
+
+
+
+int <code>&gt;=</code> int</i></p>
+
+
+
+<h4>Integer arithmetic</h4>
+
+
+
+<p><i>int</i> <code>+</code> <i>int<br>
+
+
+
+int</i> <code>-</code> <i>int<br>
+
+
+
+int</i> <code>*</code> <i>int<br>
+
+
+
+int</i> <code>/</code> <i>int<br>
+
+
+
+int</i> % <i>int</i></p>
+
+
+
+<p>The addition, subtraction and multiplication operators perform signed 32-bit integer 
+operations; overflow is not detected.</p>
+
+
+
+<p>The division operator <code>/</code> performs a signed 32-bit integer division yielding an 
+integer.&nbsp; The operator discards any fractional result, rounding the result 
+toward zero.&nbsp; Thus, for example, <code>-5 / 2</code> yields <code>-2</code>.&nbsp; 
+If a program attempts to perform an integer division <i>a</i> / <i>b</i> where
+<i>b</i> is zero, a run-time error occurs and the program is terminated.</p>
+
+
+
+<p>For integers a and b, the remainder a <code>%</code> b yields a <code>-</code> (a <code>/</code> b) 
+<code>*</code> b .&nbsp; For all integers a and b, a <code>%</code> b &equiv; a (mod 
+b) .</p>
+
+
+
+<h4>Unary minus</h4>
+
+
+
+<p><code>-</code> <i>int</i></p>
+
+
+
+<h4>Bitwise complement (~)</h4>
+
+
+
+<p><code>~</code> <i>int</i></p>
+
+
+
+<h4>Bitwise logical operators: &amp; and |</h4>
+
+
+
+<p><i>int</i> <code>&amp;</code> <i>int</i></p>
+
+
+
+<p><i>int</i> <code>|</code> <i>int</i></p>
+
+
+
+<h4>Shift operators</h4>
+
+
+
+<p><i>int</i> &lt;&lt; <i>int</i></p>
+
+
+
+<p><i>int</i> &gt;&gt; <i>int</i></p>
+
+
+
+<p>The shift operators perform bitwise shifts on signed 32-bit integer values.</p>
+
+
+
+<p>The &lt;&lt; operator shifts its left operand left by a number of bits specified by 
+the right operand, filling in bits on the right with 0.</p>
+
+
+
+<p>The &gt;&gt; operator shifts its left operand right by a number of bits specified 
+by its right operand.&nbsp; The &gt;&gt; operator performs an arithmetic shift, not a 
+logical shift: if its left operand is positive or zero, it fills in bits on the 
+left with 0, and otherwise it fills in bits on the left with 1.</p>
+
+
+
+<p><i>We should enhance GEL2 so that it has both arithmetic and logical right 
+shifts.</i></p>
+
+
+
+<h3>Floating-point operators</h3>
+
+
+
+<p>For all floating-point operators, if any operand is NaN then the result is 
+also NaN.</p>
+
+
+
+<p>Evaluating a floating-point operator will never result in a runtime error.</p>
+
+
+
+<h4>Floating-point comparison</h4>
+
+
+
+<p><i>float</i> <code>==</code> <i>float<br>
+
+
+
+double</i> <code>==</code> <i>double</i></p>
+
+
+
+<p><i>float</i> <code>!=</code><i> float<br>
+
+
+
+double</i> <code>!=</code><i> double</i></p>
+
+
+
+<p><i>float</i> <code>&lt;</code><i> float<br>
+
+
+
+double</i> <code>&lt;</code><i> double</i></p>
+
+
+
+<p><i>float</i> <code>&gt;</code><i> float<br>
+
+
+
+double</i> <code>&gt;</code><i> double</i></p>
+
+
+
+<p><i>float</i> <code>&lt;=</code><i> float<br>
+
+
+
+double</i> <code>&lt;=</code><i> double</i></p>
+
+
+
+<p><i>float</i> <i><code>&gt;=</code> float<br>
+
+
+
+double</i> <i><code>&gt;=</code> double</i></p>
+
+
+
+<h4>Floating-point arithmetic</h4>
+
+
+
+<p><i>float</i> <code>+</code> <i>float<br>
+
+
+
+double</i> <code>+</code> <i>double</i></p>
+
+
+
+<p><i>float</i> <code>-</code> <i>float<br>
+
+
+
+double</i> <code>-</code> <i>double</i></p>
+
+
+
+<p><i>float</i> <code>*</code> <i>float<br>
+
+
+
+double</i> <code>*</code> <i>double</i></p>
+
+
+
+<p><i>float</i> <code>/</code> <i>float<br>
+
+
+
+double</i> <code>/</code> <i>double</i></p>
+
+
+
+<p>A floating-point division by zero executes without error and yields either 
+Infinity or -Infinity.</p>
+
+
+
+<h4>Floating-point unary minus</h4>
+
+
+
+<p><code>-</code> <i>float<br>
+
+
+
+</i><code>-</code> <i>double</i></p>
+
+
+
+<h3>String operators</h3>
+
+
+
+<h4>String equality</h4>
+
+
+
+<p><i>string</i> == <i>string</i></p>
+
+
+
+<p>The string equality operator returns <code>true</code> if its two string operands consist 
+of exactly the same sequence of characters.</p>
+
+
+
+<h4>String concatenation</h4>
+
+
+
+<p><i>string</i> + <i>string</i></p>
+
+
+
+<p><i>string</i> + <i>object</i></p>
+
+
+
+<p><i>object</i> + <i>string</i></p>
+
+
+
+<p>The string concatenation operator returns a new string formed by 
+concatenating its two string arguments.&nbsp; In the second and third forms 
+above, the operator converts the argument of type <code>object</code> to a 
+string by invoking the <code>ToString()</code> method on the object.</p>
+
+
+
+<h2><a name="statements"></a>Statements</h2>
+
+
+
+<p><i>embedded-statement</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>block</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>empty-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>expression-statement</i> ';'<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>if-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>switch-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>while-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>do-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>for-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>foreach-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>break-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>continue-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>return-statement</i></p>
+
+
+
+<p><i>statement</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>declaration-statement</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>embedded-statement</i></p>
+
+
+
+<p>The productions above list the kinds of statements which exist in GEL2; we 
+describe these in the sections that follow.</p>
+
+
+
+<h3>Blocks</h3>
+
+
+
+<p><i>block</i>:<code><br>
+
+
+
+</code>&nbsp;&nbsp;&nbsp; <code>{</code> <i>statement</i>* <code>}</code></p>
+
+
+
+<p>A <dfn>block</dfn> forms a new lexical scope: variables declared inside a 
+block are not visible outside it.</p>
+
+
+
+<p>On exit from a block, all variables declared in the block are destroyed in 
+reverse lexical order.</p>
+
+
+
+<h3>The empty statement</h3>
+
+
+
+<p><i>empty-statement</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>;</code></p>
+
+
+
+<h3>Local variable declarations</h3>
+
+
+
+<p><i>variable-initializer</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>=</code> <i>expression</i><br>
+
+
+
+<br>
+
+
+
+<i>variable-declarator</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>id variable-initializer<sub>opt</sub></i></p>
+
+
+
+<p><i>declaration_statement</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>type</i> <i>variable-declarator<b><sup>+</sup></b><sub>list</sub></i> 
+';'</p>
+
+
+
+<h3>Expression statements</h3>
+
+
+
+<p><i>expression-statement</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>invocation</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>object-creation-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>assignment</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>pre-increment-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>pre-decrement-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>post-increment-expression</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>post-decrement-expression</i></p>
+
+
+
+<p>Certain kinds of expressions may be used as statements directly in a GEL2 
+program.</p>
+
+
+
+<h3>if</h3>
+
+
+
+<p><i>else-clause</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>else</code> <i>embedded-statement</i></p>
+
+
+
+<p><i>if-statement</i>:<code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; if (</code><i> expression </i><code>)</code>&nbsp; <i>embedded-statement<sub>
+</sub>else-clause<sub>opt</sub></i></p>
+
+
+
+<h3>switch</h3>
+
+
+
+<p><i>switch-label</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>case</code> <i>constant-expression</i> <code>:</code><br>
+
+
+
+<code>&nbsp; default :</code></p>
+
+
+
+<p><i>switch-section</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>switch-label</i><sup>+</sup> <i>statement-list</i></p>
+
+
+
+<p><i>switch-statement</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>switch ( </code><i>expression</i> <code>) {</code> <i>switch-section</i>*
+<code>}</code></p>
+
+
+
+<p>The <i>expression</i> in a <code>switch</code> statement must be of type
+<code>int</code>, <code>char</code> or <code>string</code>.&nbsp; Each <code>
+case</code> label must contain a <i>constant-expression</i> whose type is the 
+same as the type of the expression.&nbsp; All <code>case</code> labels' <i>
+constant-expressions</i> are evaluated at compile time; if any two <code>case</code> 
+labels have the same value then a compile-time error results.</p>
+
+
+
+<p>It is a compile-time error for the end of the statement list in any switch 
+section to be reachable.&nbsp; Typically each statement list will end with a
+<code>break;</code> statement.</p>
+
+
+
+<p>Each switch section in a <code>switch</code> statement has its own lexical scope; 
+variables declared in a switch section are not visible outside the section.</p>
+
+
+
+<h3>while</h3>
+
+
+
+<p><i>while-statement</i>:<code><br>
+
+
+
+</code>&nbsp;&nbsp;&nbsp; <code>while (</code> <i>expression</i> <code>)</code>&nbsp; <i>embedded-statement</i></p>
+
+
+
+<h3>do</h3>
+
+
+
+<p><i>do-statement</i>:<code><br>
+
+
+
+</code> &nbsp;&nbsp;&nbsp; <code>do</code> <i>embedded-statement</i> <code>while</code> <code>(</code> <i>expression</i> <code>) ;</code></p>
+
+
+
+<h3>for</h3>
+
+
+
+<p><i>for-initializer</i>:<i><br>
+
+
+
+</i> &nbsp;&nbsp;&nbsp; <i>type</i> <i>variable-declarator<br>
+
+
+
+</i> 
+&nbsp;&nbsp;&nbsp; <i>expression-statement</i></p>
+
+
+
+<p><i>for-statement</i>:<code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; for (</code> <i>for-initializer<sub>opt</sub></i> <code>;</code> <i>
+expression<sub>opt</sub></i> <code>;</code> <i>expression-statement<sub>opt</sub></i>
+<code>)</code>&nbsp; <i>embedded-statement</i></p>
+
+
+
+<p>A <code>for</code> statement creates a new lexical scope; any variable 
+declared in a <i>for-initializer</i> is visible only in that scope.</p>
+
+
+
+<h3>foreach</h3>
+
+
+
+<p><i>foreach-statement</i>:<code><br>
+
+
+
+</code> &nbsp;&nbsp;&nbsp; <code>foreach (</code> <i>type</i> <i>id</i> <code>in</code> <i>expression</i>
+<code>)</code> <i>embedded-statement</i></p>
+
+
+
+<p>A <code>foreach</code> statement must have an <i>expression</i> whose type T 
+has both a integer-valued property named <code>Count</code> and an indexer which 
+takes an <code>int</code> and returns a value of type T.&nbsp; The <code>foreach</code> 
+statement creates a new lexical scope and defines a new variable in that scope 
+with name <i>id</i> and type <i>type</i>.&nbsp; An explicit conversion from T to <i>
+type</i> must exist; otherwise a compile-time error results.</p>
+
+
+
+<p>At run time, the <code>foreach</code> statement first evaluates the given 
+expression, yielding a value C.&nbsp; It then retrieves the property C.<code>Count</code>, 
+yielding an integer N.&nbsp; It then performs N iterations numbered 0 through (N 
+- 1).&nbsp; On each iteration i, C [ i ] is computed, yielding a value v, which 
+is then explicitly converted to <i>type</i>.&nbsp; If the conversion fails, a runtime error 
+is reported and the program terminates.&nbsp; Otherwise the variable <i>id</i> 
+is set to the resulting value, and then the embedded statement is 
+executed.</p>
+
+
+
+<p>Inside a <code>foreach</code> statement, a <code>break</code> statement 
+causes execution of the <code>foreach</code> statement to complete immediately.&nbsp; 
+A <code>continue</code> statement aborts execution of the embedded statement; 
+execution proceeds with the next loop iteration (if any).</p>
+
+
+
+<p>An example:</p>
+
+
+
+<pre>ArrayList ^a = new ArrayList();<br>for (int x = 1 ; x &lt;= 10 ; ++x)<br>  a.Add(x * x);<br>foreach (int i in a)<br>  Console.WriteLine(i);</pre>
+
+
+
+<h3>break</h3>
+
+
+
+<p><i>break-statement</i>:<code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; break;</code></p>
+
+
+
+<p>The <code>break</code> statement breaks out of the nearest enclosing <code>
+switch</code>, <code>while</code>, <code>do</code>, <code>for</code>, or <code>
+foreach</code> statement.</p>
+
+
+
+<h3>continue</h3>
+
+
+
+<p><i>continue-statement</i>:<code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; continue;</code></p>
+
+
+
+<p>The <code>continue</code> statement begins a new iteration of the nearest enclosing <code>
+while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>statement.</p>
+
+
+
+<h3>return</h3>
+
+
+
+<p>return-statement:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>return;<br>
+
+
+
+</code>&nbsp;&nbsp;&nbsp; <code>return</code> <i>expression</i> <code>;</code></p>
+
+
+
+<h2><a name="classes"></a>Classes</h2>
+
+
+
+<h3>Class declarations</h3>
+
+
+
+<p><i>member-declaration</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>field-declaration<br>
+
+
+
+</i>&nbsp;&nbsp;&nbsp; <i>method-declaration<br>
+
+
+
+</i>&nbsp;&nbsp;&nbsp; <i>constructor-declaration<br>
+
+
+
+&nbsp;&nbsp;&nbsp; destructor-declaration<br>
+
+
+
+</i>&nbsp;&nbsp;&nbsp; <i>property-declaration<br>
+
+
+
+</i>&nbsp;&nbsp;&nbsp;&nbsp;<i>indexer-declaration</i></p>
+
+
+
+<p><i>class-base</i>:<i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i><code>:</code><i> id</i></p>
+
+
+
+<p><i>class-declaration</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>abstract</code><i><sub>opt</sub></i> <code>extern</code><i><sub>opt</sub></i><code> class</code> <i>id</i> 
+<i>class-base<sub>opt</sub></i> <code>{</code> <i>member-declaration</i>* <code>}</code></p>
+
+
+
+<p>A <code>class</code> in GEL2 is a compound reference type containing a set of
+<dfn>members</dfn>: fields, methods, constructors, destructors, properties and 
+indexers.&nbsp; All of these are described in the following sections.</p>
+
+
+
+<p>Every class other than <code>object</code> has a base class.&nbsp; If a 
+class's declaration defines no base class, then the class's base class is <code>
+object</code> . </p>
+
+
+
+<p>An <code>abstract</code> class may not be instantiated directly.</p>
+
+
+
+<p>An <code>extern</code> class is defined in imported C++ code.&nbsp; A method 
+in an <code>extern</code> class declaration may not have a body.</p>
+
+
+
+<p>Members in a GEL2 class declaration may appear in any order.</p>
+
+
+
+<h3>Fields</h3>
+
+
+
+<p><i>field-modifier</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>const protected</code> <code>public</code> <code>
+readonly</code> <code>static</code></p>
+
+
+
+<p><i>array-initializer</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>{</code> <i>expression<sup>*</sup><sub>list</sub></i>
+<code>}</code></p>
+
+
+
+<p><i>field-initializer</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>=</code> <i>expression<br>
+
+
+
+</i>&nbsp;&nbsp;&nbsp; <i>
+<code>=</code>
+array-initializer</i></p>
+
+
+
+<p><i>field-declarator</i>:<i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; id field-initializer<sub>opt</sub></i></p>
+
+
+
+<p><i>field-declaration</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>field-modifier* type field-declarator<b><sup>+</sup></b><sub>list</sub></i> <code>;</code></p>
+
+
+
+<p>A field declaration declares an instance field, a <code>static</code> field 
+or a <code>const</code> field.</p>
+
+
+
+<p>A field may not have the same name as any other field in the same class or in 
+any superclass.</p>
+
+
+
+<p>An instance field may have an initializer containing an expression to use in 
+initializing the field.&nbsp; This expression is evaluated in a static context; 
+it may not refer to <code>this</code> or to instance variables.&nbsp; A class's 
+constructor runs all instance field initializers automatically before invoking a 
+base class constructor.</p>
+
+
+
+<p>A <code>static</code> field may have an initializer containing an expression 
+to use in initializing the field.&nbsp; All <code>static</code> fields in a GEL2 
+program are initialized in lexical order before <code>Main</code> begins 
+execution.</p>
+
+
+
+<p>A <code>static</code> field of owning array type may have an array initializer 
+containing a list of values to use to initialize the array.&nbsp; Every expression in an 
+array initializer must evaluate to a constant at compile time.</p>
+
+
+
+<p>A <code>const</code> field is implicitly static.&nbsp; A <code>const</code> 
+field must be of a simple type or the <code>string</code> type, and must have an 
+initializer containing only literals, operators and references to other <code>
+const</code> fields.&nbsp; The compiler evaluates each <code>const</code> 
+field's value at compile time.</p>
+
+
+
+<p><i>GEL2 does not (yet) have <code>enum</code> types as found in other popular 
+languages; for now, a GEL2 programmer can imitate <code>enum</code> using a class 
+containing only <code>public const int</code> fields.</i></p>
+
+
+
+<h3>Methods</h3>
+
+
+
+<p><i>method-modifier</i>: one of<code><br>
+
+
+
+</code> &nbsp;&nbsp;&nbsp; <code>abstract</code> <code>override</code> <code>
+protected</code> <code>public</code> <code>static</code> <code>virtual</code></p>
+
+
+
+<p><i>parameter-modifier</i>: one of<code><br>
+
+
+
+</code> &nbsp;&nbsp;&nbsp; <code>ref<br>
+
+
+
+</code>&nbsp;&nbsp;&nbsp; <code>out</code></p>
+
+
+
+<p><i>parameter</i>:<i> parameter-modifier<sub>opt</sub> type id</i></p>
+
+
+
+<p><i>method-body</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>block</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>;</code></p>
+
+
+
+<p><i>method-declaration</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>method-modifier</i>* <i>type id </i><code>(</code>
+<i>parameter<sup>*</sup><sub>list</sub></i> <code>)</code> <i>method-body</i></p>
+
+
+
+<p>A <i>method-declaration </i>declares a method in a class.</p>
+
+
+
+<p>A <code>virtual</code> method may be overridden in subclasses.&nbsp; When 
+invoking a <code>virtual</code> method on an object, GEL2 uses the object's 
+run-time type to dispatch the invocation either to the method itself or to one 
+of its overrides.&nbsp; A <code>virtual</code> method may not be <code>private</code>.</p>
+
+
+
+<p>An <code>override</code> method overrides a virtual method in a superclass.&nbsp; 
+When the <code>override</code> keyword is specified for a method M, a superclass 
+method with the same signature as M must exist and that method must be <code>
+virtual</code> or <code>abstract</code>.&nbsp; An override method must have the 
+same declared accessibility (either <code>protected</code> or <code>public</code>) 
+as the method it overrides.</p>
+
+
+
+<p>The programmer must specify the <code>override</code> keyword when overriding 
+a method.&nbsp; If <code>override</code> is not specified for a method and some 
+superclass contains a method with an identical signature, a compile-time error 
+occurs.</p>
+
+
+
+<p>An <code>abstract</code> method has no implementation; its <i>method-body</i> 
+must consist of a single semicolon.&nbsp; An <code>abstract</code> method is 
+implicitly <code>virtual</code>, and may appear only in an <code>abstract</code> 
+class.&nbsp; An <code>abstract</code> method may not be <code>private</code>.</p>
+
+
+
+<p>A <code>ref</code> parameter indicates that an argument is passed by 
+reference: the caller must specify the <code>ref</code> keyword and an <i>
+l-value</i>, which the method may modify.&nbsp; For example:</p>
+
+
+
+<pre>void Swap(ref int a, ref int b) {<br>  int t = a;<br>  a = b;<br>  b = t;<br>}<br><br>void Fun() {<br>  int x = 3, y = 4;<br>  Swap(ref x, ref y);<br>  Console.WriteLine("x = {0}, y = {1}", x, y);  // writes "x = 4, y = 3"<br>}</pre>
+
+
+
+<p>An <code>out</code> parameter is used for returning a value from a method.&nbsp; 
+The caller must specify the <code>out</code> keyword and an <i>l-value</i>, 
+which the method must set (and may not read).&nbsp; For example:</p>
+
+
+
+<pre>void Power(int x, out int y, out int z) {<br>  y = x * x;<br>  z = x * x * x;<br>}</pre>
+
+
+
+<pre>void Fun() {<br>  int a, b;<br>  Power(3, out a, out b);<br>  Console.WriteLine("a = {0}, b = {1}", a, b);  // writes "a = 9, b = 27"<br>}</pre>
+
+
+
+<h3>Constructors</h3>
+
+
+
+<p><i>constructor-modifier</i>: one of<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>protected public</code></p>
+
+
+
+<p><i>constructor-initializer</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; :<code> base</code> <code>(</code> <i>argument<sup>*</sup><sub>list</sub></i>
+<code>)</code><br>
+
+
+
+&nbsp;&nbsp;&nbsp; :<code> this</code> <code>(</code> <i>argument<sup>*</sup><sub>list</sub></i>
+<code>)</code></p>
+
+
+
+<p><i>constructor-body:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; block</i></p>
+
+
+
+<p><i>constructor-declaration</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>constructor-modifier</i><sup>*</sup> <i>id</i> <code>(</code>
+<i>parameter<sup>*</sup><sub>list</sub></i> <code>)</code> <i>
+constructor-initializer<sub>opt</sub></i> <i>constructor-body</i></p>
+
+
+
+<p>A <dfn>constructor</dfn> is used to initialize a newly allocated object.</p>
+
+
+
+<p>A constructor declaration may include a <i>constructor initializer </i>which 
+specifies a <dfn>base constructor</dfn> to be called as part of the constructor 
+invocation process.&nbsp; For a constructor declared in class C, a constructor 
+initializer beginning with <code>: base</code> indicates a base constructor in 
+C's superclass; a constructor initializer beginning with <code>: this</code> 
+indicates a base constructor in C itself.&nbsp; A constructor with no 
+initializer is equivalent to one with the initializer <code>: base ( )</code>. </p>
+
+
+
+<p>A constructor initializer includes a (possibly empty) set of arguments which 
+are passed to the base constructor.&nbsp; Initializer arguments are evaluated in 
+a static context: they may not refer to <code>this</code> or to instance fields.&nbsp; 
+At compile time, GEL2 performs a <a href="#member%20lookup">member lookup</a> to find 
+a base constructor applicable to the given initializer arguments.</p>
+
+
+
+<p>At run time, a constructor in class C executes as follows:</p>
+
+
+
+<ol>
+
+
+
+	<li>If the base constructor is in C's superclass, all instance <i>fields</i> 
+	in C are <i>initialized</i>: if a field has an initializer then its 
+	initializer is evaluated and the field receives the resulting value, and 
+	otherwise the field is set to its type's default value.</li>
+
+
+
+	<li>The base constructor is invoked; it will itself run the steps in this 
+	list.</li>
+
+
+
+	<li>The constructor's body is run.</li>
+
+
+
+</ol>
+
+
+
+<h3>Destructors</h3>
+
+
+
+<p><i>Destructors are not implemented yet.</i></p>
+
+
+
+<p><i>destructor-declaration:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; </i><code>~</code><i> id </i><code>( )</code><i> block</i></p>
+
+
+
+<p>GEL2 runs an object's <dfn>destructor</dfn> before it begins to destroy the 
+object.</p>
+
+
+
+<p>A destructor must have the same name as its enclosing class.</p>
+
+
+
+<h3>Properties</h3>
+
+
+
+<p><i>accessor</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>get</code> <i>method-body</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>set</code> <i>method-body</i></p>
+
+
+
+<p><i>property-declaration</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>method-modifier</i><sup>*</sup> <i>type</i> <i>id</i>
+<code>{</code> <i>accessor accessor<sub>opt</sub></i> <code>}</code></p>
+
+
+
+<p>A <dfn>property</dfn> is accessed using the same syntax used to access 
+fields, but a property can run arbitrary code when it is read or set.&nbsp; For 
+example:</p>
+
+
+
+<pre>class Foo {<br>  int i_;<br><br>  public int Count {<br>    get { return ++i_; }<br>    set { i_ = value; }<br>  }<br><br>  public static void Main() {<br>    Foo ^f = new Foo();<br>    f.Count = 4;<br>    Console.WriteLine(f.Count);<br>    Console.WriteLine(f.Count);<br>  }<br>}</pre>
+
+
+
+<p>When run, the program prints the numbers 5 and 6.</p>
+
+
+
+<p>The <code>get</code> and <code>set</code> accessors inside a property 
+declaration contain code which runs when a property is read or set, 
+respectively.&nbsp; Inside a <code>set</code> block, the keyword <code>value</code> 
+evaluates to the value being assigned to the property.&nbsp; A property 
+declaration may specify a <code>get</code> accessor, a <code>set</code> 
+accessor, or both.</p>
+
+
+
+<h3>Indexers</h3>
+
+
+
+<p><i>indexer-modifier</i>: one of<code><br>
+
+
+
+</code> &nbsp;&nbsp;&nbsp; <code>abstract</code> <code>override</code> <code>
+protected</code> <code>public</code> <code>static</code> <code>virtual</code></p>
+
+
+
+<p><i>indexer-declaration</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>indexer-modifier</i><sup>*</sup> <i>type</i> <code>this</code>
+<code>[</code> <i>type id</i> <code>]</code> <code>{</code> <i>accessor accessor<sub>opt
+</sub></i><code>}</code></p>
+
+
+
+<p>An indexer is accessed using the same syntax to access array elements, but an 
+indexer can run arbitrary code when it is read or set.&nbsp; For example:</p>
+
+
+
+<pre>class Foo {<br>  int[] ^a_;<br>  int accesses_;<br><br>  public Foo() { a_ = new int[5]; accesses_ = 0; }<br><br>  public int this [int i] {<br>    get { ++accesses_; return a_[i]; }<br>    set { ++accesses_; a_[i] = value; }<br>  }<br><br>  public static void Main() {<br>    Foo ^f = new Foo();<br>    f[2] = 4;<br>    Console.WriteLine(f[2]);<br>    Console.WriteLine(f.accesses_);<br>  }<br>}</pre>
+
+
+
+<p>When run, the program prints the numbers 4 and 2.</p>
+
+
+
+<p>The <code>get</code> and <code>set</code> accessors inside an indexer 
+declaration contain code which runs when an indexer is read or set, 
+respectively.&nbsp; Inside a <code>set</code> block, the keyword <code>value</code> 
+evaluates to the value being assigned.&nbsp; An indexer declaration may specify 
+a <code>get</code> accessor, a <code>set</code> accessor, or both.</p>
+
+
+
+<p>An indexer may not be <code>static</code>.</p>
+
+
+
+<h2><a name="programs"></a>Programs</h2>
+
+
+
+<p><i>dummy-namespace-name</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>id</i><br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>dummy-namespace-name</i> <code>.</code> <i>id</i></p>
+
+
+
+<p><i>directive</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <code>import</code> <i>string-literal</i> <code>;</code><br>
+
+
+<code><br>
+
+
+</code></p>
+
+
+
+<p><i>program</i>:<br>
+
+
+
+&nbsp;&nbsp;&nbsp; <i>directive<sup>*</sup> class-declaration<sup>*</sup></i></p>
+
+
+
+<p>A GEL2 <dfn>program</dfn> consists of a set of <dfn>directives</dfn> followed by 
+a set of class declarations.</p>
+
+
+
+<p>An <code>import</code> directive imports a file containing GEL2 or C++ code into 
+a GEL2 program.&nbsp; Importing a file is equivalent to providing its name on the 
+command line passed to <code>gel2 -c</code>.&nbsp; When a source file F uses an
+<code>import</code> directive to import a file, GEL2 first looks for the file in 
+the directory containing F; if the file is not found there then GEL2 looks in the 
+directory containing the GEL2 compiler.&nbsp; Importing a file multiple times is 
+equivalent to importing the file only once.</p>
+
+
+<p>Class declarations in a GEL2 program may appear in any order.</p>
+
+
+
+<p>A program must have a <code>Main</code> method in some class.&nbsp; <code>
+Main</code> must be a <code>public static</code> method with either of the 
+following signatures:</p>
+
+
+
+<pre>public static void Main();<br>public static void Main(string[] args);</pre>
+
+
+
+<h2><a name="predefined classes"></a>Predefined Classes</h2>
+
+
+
+<p>GEL2 contains a small number of predefined classes.&nbsp; These classes are 
+available in any GEL2 program.</p>
+
+
+
+<h3>Basic classes</h3>
+
+
+
+<h4>Object</h4>
+
+
+
+<pre>abstract class Object {<br>  public virtual bool Equals(Object o);<br>  public virtual int GetHashCode();<br>  public virtual string ToString();<br>}</pre>
+
+
+
+<p>The <code>Object</code> class implements the built-in type <code>object</code>, 
+the root of the type hierarchy.&nbsp; <code>Object</code> and <code>object</code> 
+are synonyms in GEL2.</p>
+
+
+
+<h4>Bool</h4>
+
+
+
+<pre>class Bool {<br>}</pre>
+
+
+
+<p>The <code>Bool</code> class implements the simple type <code>bool</code>.&nbsp;
+<code>Bool</code> and <code>bool</code> are synonyms in GEL2.</p>
+
+
+
+<h4>Char</h4>
+
+
+
+<pre>class Char {<br>  public static bool IsDigit(char c);<br>  public static bool IsLetter(char c);<br>  public static bool IsWhiteSpace(char c);<br>}</pre>
+
+
+
+<p>The <code>Char</code> class implements the simple type <code>char</code>.&nbsp;
+<code>Char</code> and <code>char</code> are synonyms in GEL2.</p>
+
+
+
+<h4>Int</h4>
+
+
+
+<pre>class Int {<br>  public static int Parse(string s);<br>  public static int Parse(string s, int style);<br>}</pre>
+
+
+
+<p>The <code>Int</code> class implements the simple type <code>int</code>.&nbsp;
+<code>Int</code> and <code>int</code> are synonyms in GEL2.</p>
+
+
+
+<p>The static method <code>Parse(string s)</code> parses a string <code>s</code>, 
+producing a signed integer.&nbsp; If <code>s</code> does not consist of a string 
+of decimal digits optionally preceded by a minus sign, <code>Parse</code> 
+returns 0.</p>
+
+
+
+<p>The static method <code>Parse(string s, int style)</code> parses either a 
+decimal or a hexadecimal integer as specified by <code>style</code>, which can 
+be either <code>NumberStyle.Integer</code> or <code>NumberStyle.HexNumber</code>.</p>
+
+
+
+<h4>Array</h4>
+
+
+
+<pre>class Array {<br>  public static void Copy(Array source, int source_index, Array dest, int dest_index, int length);<br>  public void CopyTo(Array array, int index);<br>  public int Length { get; }<br>}</pre>
+
+
+
+<p>The built-in class <code>Array</code> is the superclass of all array types.</p>
+
+
+
+<p>The <code>Copy</code> and <code>CopyTo</code> methods copy elements between 
+arrays.&nbsp; These methods check at run time that the source and destination 
+arrays have the same array type T [], where T must be non-owning; otherwise an 
+error occurs and execution is terminated.</p>
+
+
+
+<h4>String</h4>
+
+
+
+<pre>class String {<br>  public static string New(char[] a);<br><br>  public char this[int index] { get; }<br><br>  public static int CompareOrdinal(string s, string t);<br>  public bool EndsWith(string s);<br>  public static string Format(string s, object o0);<br>  public static string Format(string s, object o0, object o1);<br>  public static string Format(string s, object o0, object o1, object o2);<br>  public int IndexOf(char c);<br>  public int LastIndexOf(char c);<br>  public int Length { get; }<br>  public bool StartsWith(string s);<br>  public string Substring(int start_index, int length);<br>}</pre>
+
+
+
+<p>The <code>String</code> class implements the built-in type <code>string</code>.&nbsp;
+<code>String</code> and <code>string</code> are synonyms in GEL2.</p>
+
+
+
+<p>The static method <code>New</code> converts an array of characters to a <code>
+string</code>.</p>
+
+
+
+<p>The <code>CompareOrdinal</code> method returns an integer which is less than, 
+equal to, or greater than zero in the cases in which the given string <code>s</code> 
+is lexicographically less than, equal to, or greater than the given string <code>
+t</code>.</p>
+
+
+
+<p>The <code>IndexOf</code> method returns the zero-based index of the first 
+occurrence of a character <code>c</code> in a string; if <code>c</code> does not 
+appear in the string at all, then <code>IndexOf</code> returns -1.</p>
+
+
+
+<p>The <code>LastIndexOf</code> method returns the zero-based index of the last 
+occurrence of a character <code>c</code> in a string; if <code>c</code> does not 
+appear in the string at all, then <code>LastIndexOf</code> returns -1.</p>
+
+
+
+<h5><a name="string formatting"></a>String formatting</h5>
+
+
+
+<p>The static method <code>Format</code> constructs a string from a template 
+string <code>s</code> and a set of object arguments.&nbsp; The template string 
+may contain references of the form<code> {</code>&nbsp;<i>n</i> <code>}</code>, where
+<i>n</i> is a digit.&nbsp; Each such reference is replaced by the <i>n</i>-th 
+object argument, converted to a string using the <code>object.ToString</code> 
+method; object arguments are numbered starting with zero.&nbsp; For example:</p>
+
+
+
+<pre>string s = String.Format("how now {0} {1}", "brown", "cow");   // ==&gt; "how now brown cow" </pre>
+
+
+
+<h4>StringBuilder</h4>
+
+
+
+<pre>class StringBuilder {<br>  public StringBuilder();<br>  public void Append(char c);<br>  public void Append(string s);<br>  public void AppendFormat(string s, object o0);<br>  public void AppendFormat(string s, object o0, object o1);<br>  public void AppendFormat(string s, object o0, object o1, object o2);<br>  public override string ToString();<br>}</pre>
+
+
+
+<p>A <code>StringBuilder</code> is used to construct a string.</p>
+
+
+
+<h4>Pool</h4>
+
+
+
+<pre>class Pool {<br>  public Pool();<br>}</pre>
+
+
+
+<p>The <code>Pool</code> class implements the built-in type <code>pool</code>.&nbsp;
+<code>Pool</code> and <code>pool</code> are synonyms in GEL2.</p>
+
+
+
+<h4>Debug</h4>
+
+
+
+<pre>class Debug {<br>  public static void Assert(bool b);<br>}</pre>
+
+
+
+<p>The <code>Debug.Assert</code> method issues a run-time error and terminates 
+program execution if its argument is <code>false</code>.</p>
+
+
+
+<h4>NumberStyles</h4>
+
+
+
+<pre>class NumberStyles {<br>  public const int Integer = 0, HexNumber = 1;<br>}</pre>
+
+
+
+<p>The <code>NumberStyles</code> class holds constants which may be passed to 
+the <code>Int.Parse</code> method.</p>
+
+
+
+<h2><a name="library classes"></a>Library classes</h2>
+
+
+
+<h3>I/O classes</h3>
+
+
+
+<p>These classes are available in any program.</p>
+
+
+
+<h4>Console</h4>
+
+
+
+<pre>class Console {<br>  public static void Write(object o);<br>  public static void Write(string s, object o0);<br>  public static void Write(string s, object o0, object o1);<br>  public static void Write(string s, object o0, object o1, object o2);<br><br>  public static void WriteLine(object o);<br>  public static void WriteLine(string s, object o0);<br>  public static void WriteLine(string s, object o0, object o1);<br>  public static void WriteLine(string s, object o0, object o1, object o2);<br>}</pre>
+
+
+
+<p>The <code>Console</code> class is used to write to standard output.&nbsp; The 
+static methods <code>Write</code> and <code>WriteLine</code> format output as 
+described in <a href="#string%20formatting">String formatting</a>, above.</p>
+
+
+
+<h4>File</h4>
+
+
+
+<pre>class File {<br>  public static void Delete(string path);<br>  public static bool Exists(string path);<br>  public static string ReadAllText(string path);<br>}</pre>
+
+
+
+<p>The <code>File</code> class contains <code>static</code> methods which act on 
+files.</p>
+
+
+
+<p>The <code>Delete</code> method deletes any file with the given name.&nbsp; If 
+no such file exists, no error is reported.</p>
+
+
+
+<p>The <code>ReadAllText</code> method opens a file with the given name, reads a 
+string containing the entire contents of the file and then closes the file.&nbsp; 
+It returns the read string.</p>
+
+
+
+<h4>Path</h4>
+
+
+
+<pre>class Path {<br>  public static string Combine(string path1, string path2);<br>  public static string GetDirectoryName(string path);<br>  public static string GetExtension(string path);<br>  public static string GetFileNameWithoutExtension(string path);<br>  public static string GetTempFileName();<br>}</pre>
+
+
+
+<p>The <code>Path</code> class contains static methods which operate on file 
+system paths.</p>
+
+
+
+<p>The <code>GetFileNameWithoutExtension</code> method returns a copy of the given path 
+with any file extension removed.&nbsp; For example, <code>
+Path.GetFileNameWithoutExtension("/mydir/red.txt")</code> returns the string "<code>/mydir/red</code>".</p>
+
+
+
+<h4>StreamReader</h4>
+
+
+
+<pre>class StreamReader {<br>  public StreamReader(string filename);<br><br>  public void Close();<br><br>  public int Read();<br>  public int Peek();<br>  public string ReadToEnd();<br>}</pre>
+
+
+
+<p>A <code>StreamReader</code> is used to read from a file.</p>
+
+
+
+<p>The <code>StreamReader</code> constructor opens a file with the given name.&nbsp; 
+If no such file exists, a run-time error occurs and the program is terminated.</p>
+
+
+
+<h4>StreamWriter</h4>
+
+
+
+<pre>class StreamWriter {<br>  public StreamWriter(string filename);<br><br>  public void Close();<br><br>  public void Write(object o);<br>  public void Write(string s, object o0);<br>  public void Write(string s, object o0, object o1);<br>  public void Write(string s, object o0, object o1, object o2);<br><br>  public void WriteLine(object o);<br>  public void WriteLine(string s, object o0);<br>  public void WriteLine(string s, object o0, object o1);<br>  public void WriteLine(string s, object o0, object o1, object o2);<br>}</pre>
+
+
+
+<p>A <code>StreamWriter</code> is used to write to a file.</p>
+
+
+
+<p>The <code>StreamWriter</code> constructor opens a file with the given name.&nbsp; 
+If no such file exists, a run-time error occurs and the program is terminated.</p>
+
+
+
+<h3>System classes</h3>
+
+
+
+<p>These classes are available in any program.</p>
+
+
+
+<h4>Environment</h4>
+
+
+
+<pre>class Environment {<br>  public static string CurrentDirectory { get; set; }<br>  public static string GetEnvironmentVariable(string value);<br>  public static void Exit(int code);<br>  public static OperatingSystem OSVersion { get; }<br>}</pre>
+
+
+
+<p>The <code>Environment.Exit</code> method exits the running program 
+immediately, returning the given exit code to the operating system.</p>
+
+
+
+<h4>OperatingSystem</h4>
+
+
+
+<pre>extern class OperatingSystem {<br>  public int Platform { get; }<br>}</pre>
+
+
+
+<p>The <code>OperatingSystem.Platform</code> method returns a constant from the
+<code>PlatformID</code> class representing the operating system on which the 
+program is currently executing.</p>
+
+
+
+<h4>PlatformID</h4>
+
+
+
+<pre>extern class PlatformID {<br>  public const int Unix = 0, Win32NT = 1;<br>}</pre>
+
+
+
+<p>The <code>PlatformID</code> class contains constants representing operating 
+system platforms.</p>
+
+
+
+<h4>Process</h4>
+
+
+
+<pre>class Process {<br>  public int ExitCode { get; }<br>  public static Process GetCurrentProcess();<br>  public ProcessModule MainModule { get; }<br>  public static Process ^ Start(ProcessStartInfo start_info);<br>  public void WaitForExit();<br>}</pre>
+
+
+
+<p>The <code>ExitCode</code> property returns a 
+process's exit code; it may be called only after a process has terminated.</p>
+
+
+
+<p>The <code>MainModule</code> property returns a <code>ProcessModule</code> 
+representing the executable file used to start the given process.</p>
+
+
+
+<p>The static method <code>Start</code> starts a new process and returns a new
+<code>Process</code> object.</p>
+
+
+
+<p>The <code>WaitForExit</code> method waits for 
+a process to terminate.</p>
+
+
+
+<h4>ProcessModule</h4>
+
+
+
+<pre>class ProcessModule {<br>  public string FileName { get; }<br>}</pre>
+
+
+
+<p>A<code> ProcessModule</code> represents a module of a process: on Windows, 
+this is generally an .EXE or .DLL file used by a process.&nbsp; At the moment 
+the only way to get a <code>ProcessModule</code> in GEL2 is to retrieve the <code>
+Process.MainModule</code> property, which returns the module corresponding to a 
+process's executable file. </p>
+
+
+
+<h4>ProcessStartInfo</h4>
+
+
+
+<pre>class ProcessStartInfo {<br>  public ProcessStartInfo(string filename, string args);<br><br>  public bool UseShellExecute { set; }<br>}</pre>
+
+
+
+<p>A <code>ProcessStartInfo</code> specifies information used to start a new 
+process.</p>
+
+
+
+<p>The <code>UseShellExecute</code> property is ignored; it is provided for 
+compatibility with C#, which we've used to bootstrap the GEL2 compiler.</p>
+
+
+
+<h3>Collection classes</h3>
+
+
+
+<p>To use GEL2's collection classes in a program, import <code>gel2_collection.gel2</code> 
+.</p>
+
+
+
+<p><i>Ownership in these collection classes is awkward; we have separate owning 
+and non-owning ArrayList classes, and a Hashtable arbitrarily owns its values 
+but not its keys.&nbsp; It would be useful to extend GEL2 with a generics system which 
+would allow us to implement classes ArrayList&lt;T&gt; and Hashtable&lt;K, V&gt;, where T, K, and 
+V may be instantiated with either owning or non-owning types.</i></p>
+
+
+
+<h4>NonOwningArrayList</h4>
+
+
+
+<pre>class NonOwningArrayList {<br>  public int Count { get; }<br>  public object this[int index] { get; set; }<br>  public void Add(object o);<br>  public void RemoveAt(int index);<br>}</pre>
+
+
+
+<p>A <code>NonOwningArrayList</code> is a dynamically sized array which does not 
+own its elements.</p>
+
+
+
+<h4>ArrayList</h4>
+
+
+
+<pre>class ArrayList {<br>  public int Count { get; }<br>  public object this[int index]; { get; }<br>  public object ^Take(int index);<br>  public void Add(object ^o);<br>}</pre>
+
+
+
+<p>An <code>ArrayList</code> is a dynamically sized array which owns its 
+elements.</p>
+
+
+
+<h4>Hashtable</h4>
+
+
+
+<pre>class Hashtable {<br>  public object this[object key] { get; }<br>  public void Set(object key, object ^value);<br>  public object ^Take(object key);<br>  public bool ContainsKey(object key);<br>}</pre>
+
+
+
+<p>A <code>Hashtable</code> represents a hash table.&nbsp; A <code>Hashtable</code> 
+owns its values but not its keys.</p>
+
+
+
+<p>&nbsp;</p>
+
+
+
+</body>
+</html>

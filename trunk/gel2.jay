@@ -1,0 +1,545 @@
+/*
+Copyright (c) 2006 Google Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+%{
+public class Parser {
+%}
+
+%token SCAN_ERROR
+
+%token <string> ID
+%token <char> CHAR_LITERAL
+%token <double> DOUBLE_LITERAL
+%token <float> FLOAT_LITERAL
+%token <int> INT_LITERAL
+%token <string> STRING_LITERAL
+
+%token FIRST_KEYWORD
+%token ABSTRACT
+%token AS
+%token BASE
+%token BOOL
+%token BREAK
+%token CASE
+%token CHAR
+%token CLASS
+%token CONST_TOKEN
+%token CONTINUE
+%token DEFAULT
+%token DO
+%token DOUBLE
+%token ELSE
+%token EXTERN
+%token FALSE_TOKEN
+%token FLOAT
+%token FOR
+%token FOREACH
+%token IF
+%token IMPORT
+%token IN_TOKEN
+%token INT
+%token IS
+%token NEW
+%token NULL
+%token OBJECT
+%token OUT_TOKEN
+%token OVERRIDE
+%token POOL
+%token PRIVATE
+%token PROTECTED
+%token PUBLIC
+%token READONLY
+%token REF
+%token RETURN
+%token SHORT
+%token STATIC
+%token STRING
+%token SWITCH
+%token TAKE
+%token THIS_TOKEN
+%token TRUE_TOKEN
+%token VIRTUAL
+%token VOID_TOKEN
+%token WHILE
+%token LAST_KEYWORD
+
+%token AND_EQUAL   "&="
+%token ARRAY_TYPE  "[]"
+%token CAST_CLOSE_PAREN
+%token MINUS_EQUAL    "-="
+%token MINUS_MINUS    "--"
+%token OP_AND         "&&"
+%token OP_EQUAL       "=="
+%token OP_GE          ">="
+%token OP_LE          "<="
+%token OP_LEFT_SHIFT  "<<"
+%token OP_NE          "!="
+%token OP_OR          "||"
+%token OP_RIGHT_SHIFT ">>"
+%token OR_EQUAL       "|="
+%token PERCENT_EQUAL  "%="
+%token PLUS_EQUAL     "+="
+%token PLUS_PLUS      "++"
+%token SLASH_EQUAL    "/="
+%token STAR_EQUAL     "*="
+
+%right '=' STAR_EQUAL SLASH_EQUAL PERCENT_EQUAL PLUS_EQUAL MINUS_EQUAL AND_EQUAL OR_EQUAL
+%right '?' ':'
+%left <int> OP_OR
+%left <int> OP_AND
+%left <int> OP_EQUAL OP_NE
+%left <int> '|'
+%left <int> '&'
+%left <int> '<' '>' OP_LE OP_GE IS AS
+%left <int> OP_LEFT_SHIFT OP_RIGHT_SHIFT
+%left <int> '+' '-'
+%left <int> '*' '/' '%'
+%left <int> '(' ')' CAST_CLOSE_PAREN
+
+%type <TypeLiteral> predefined_type
+%type <TypeExpr> class_type base_type type
+%type <Argument> argument
+%type <ArrayList> argument_list argument_list_opt
+%type <Invocation> invocation
+%type <New> object_creation_expression
+%type <LValue> lvalue
+%type <Literal> literal
+%type <ArrayList> variable_initializer_list variable_initializer_list_opt
+%type <ArrayInitializer> array_initializer
+%type <int> rank_specifiers
+%type <IncDec> post_increment_expression post_decrement_expression
+%type <Expression> primary
+%type <IncDec> pre_increment_expression pre_decrement_expression
+%type <Expression> unary
+%type <Expression> assignment
+%type <Expression> expr expr_opt
+%type <Expression> variable_initializer_opt
+%type <VariableDeclaration> variable_declaration multiple_variable_declaration declaration_statement
+%type <ExpressionStatement> expression_statement expression_statement_opt
+%type <If> if_statement
+%type <Expression> switch_label
+%type <ArrayList> switch_labels
+%type <SwitchSection> switch_section
+%type <ArrayList> switch_sections
+%type <Switch> switch_statement
+%type <While> while_statement
+%type <Do> do_statement
+%type <InlineStatement> for_initializer_opt
+%type <For> for_statement
+%type <ForEach> foreach_statement
+%type <Return> return_statement
+%type <Statement> statement embedded_statement
+%type <StatementList> statement_list statement_list_opt
+%type <Block> block
+%type <int> attributes
+%type <Expression> field_initializer_opt
+%type <ArrayList> field_declarations field_declaration
+%type <int> parameter_modifier_opt
+%type <Parameter> parameter
+%type <ArrayList> parameter_list parameter_list_opt
+%type <Block> method_body
+%type <bool> base_or_this
+%type <Method> method_declaration
+%type <Property> property_declaration
+%type <Indexer> indexer_declaration
+%type <Constructor> constructor_declaration
+%type <string> class_base_opt
+%type <ClassPtr> class_declaration_start class_declaration
+
+%start program
+
+%%
+
+predefined_type:   BOOL                 { $$ = new TypeLiteral(GBool.type_); }
+                 | CHAR                 { $$ = new TypeLiteral(GChar.type_); }
+                 | DOUBLE               { $$ = new TypeLiteral(GDouble.type_); }
+                 | FLOAT                { $$ = new TypeLiteral(GFloat.type_); }
+                 | INT                  { $$ = new TypeLiteral(GInt.type_); }
+                 | SHORT                { $$ = new TypeLiteral(GInt.type_); }
+                 | OBJECT               { $$ = new TypeLiteral(GObject.type_); }
+                 | STRING               { $$ = new TypeLiteral(GString.type_); }
+                 | POOL                 { $$ = new TypeLiteral(PoolClass.instance_); }
+;
+
+class_type:  predefined_type      { $$ = $1; }
+           | ID                   { $$ = new TypeName($1); }
+;           
+
+base_type: class_type           { $$ = $1; }
+           | type ARRAY_TYPE      { $$ = new ArrayTypeExpr($1); }
+;
+
+type: base_type          { $$ = $1; }
+    | base_type '^'      { $$ = new OwningExpr($1); }
+;
+
+// Expressions
+
+argument:   expr             { $$ = new InArgument($1); }
+          | REF lvalue       { $$ = new RefOutArgument(Mode.Ref, $2); }
+          | OUT_TOKEN lvalue       { $$ = new RefOutArgument(Mode.Out, $2); }
+;          
+
+argument_list:  argument                     { ArrayList ^a = new ArrayList(); a.Add($1); $$ = a; }
+              | argument_list ',' argument   { $*1.Add($3);  $$ = $1; }
+;              
+
+argument_list_opt:                    { $$ = new ArrayList(); }
+                    | argument_list   { $$ = $1; }
+;                    
+
+invocation: ID '(' argument_list_opt ')'
+                { $$ = new Invocation(null, $1, $3); }
+          | primary '.' ID '(' argument_list_opt ')'
+                { $$ = new Invocation($1, $3, $5); }
+          | BASE '.' ID '(' argument_list_opt ')'
+                { $$ = new Invocation(new Base(), $3, $5); }
+          | predefined_type '.' ID '(' argument_list_opt ')'
+              { $$ = new Invocation(new PredefinedType((Class) $1.type_), $3, $5); }
+;
+
+object_creation_expression: NEW class_type '(' argument_list_opt ')'
+      { $$ = new New(null, $2, $4); }
+                          | primary '.' NEW class_type '(' argument_list_opt ')'
+      { $$ = new New($1, $4, $6); }
+;
+
+lvalue: ID                         { $$ = new Name($1); }
+      | primary '.' ID             { $$ = new Dot($1, $3);  }
+      | BASE '.' ID                { $$ = new Dot(new Base(), $3); }
+      | primary '[' expr ']'       { $$ = new Sub($1, $3); }
+      | BASE '[' expr ']'          { $$ = new Sub(new Base(), $3); }
+;
+
+literal:  FALSE_TOKEN                { $$ = new Literal(new GBool(false)); }
+        | TRUE_TOKEN                 { $$ = new Literal(new GBool(true)); }
+        | CHAR_LITERAL               { $$ = new Literal(new GChar($1));  }
+        | DOUBLE_LITERAL             { $$ = new Literal(new GDouble($1)); }
+        | FLOAT_LITERAL              { $$ = new Literal(new GFloat($1)); }
+        | INT_LITERAL                { $$ = new Literal(new GInt($1));   }
+        | STRING_LITERAL             { $$ = new Literal(new GString($1));  }
+        | NULL                       { $$ = new Literal(new Null()); }
+;        
+
+variable_initializer_list:  expr   { ArrayList ^list = new ArrayList(); list.Add($1); $$ = list; }
+                          | variable_initializer_list ',' expr  { $*1.Add($3); $$ = $1; }
+;                          
+
+variable_initializer_list_opt:  { $$ = new ArrayList(); }
+                               | variable_initializer_list  { $$ = $1; }
+;                               
+
+array_initializer: '{' variable_initializer_list_opt '}'  { $$ = new ArrayInitializer($2); }
+                 | '{' variable_initializer_list ',' '}'  { $$ = new ArrayInitializer($2); }
+;
+
+rank_specifiers:                                { $$ = 0; }
+                 | rank_specifiers ARRAY_TYPE   { $$ = $1 + 1; }
+;                 
+
+post_increment_expression: lvalue PLUS_PLUS      { $$ = new IncDec(false, true, $1); }
+;
+
+post_decrement_expression: lvalue MINUS_MINUS    { $$ = new IncDec(false, false, $1); }
+;
+
+primary:  literal                                         { $$ = $1; }
+        | lvalue                                          { $$ = $1; }
+        | '(' expr ')'                                    { $$ = new Parenthesized($2); }
+        | invocation                                      { $$ = $1; }
+        | THIS_TOKEN                                      { $$ = new This(); }
+        | post_increment_expression                       { $$ = $1; }
+        | post_decrement_expression                       { $$ = $1; }
+        | object_creation_expression                      { $$ = $1; }
+        | NEW type '[' expr ']' rank_specifiers { $$ = new NewArray($2, $6, $4); }
+;
+
+pre_increment_expression: PLUS_PLUS lvalue       { $$ = new IncDec(true, true, $2); }
+;
+
+pre_decrement_expression: MINUS_MINUS lvalue     { $$ = new IncDec(true, false, $2); }
+;
+
+unary:   primary                               { $$ = $1; }
+      | '-' unary                              { $$ = new Minus($2); }
+      | '!' unary                              { $$ = new Not($2); }
+      | '~' unary                              { $$ = new Complement($2); }
+      | pre_increment_expression               { $$ = $1; }
+      | pre_decrement_expression               { $$ = $1; }
+      | '(' base_type CAST_CLOSE_PAREN unary   { $$ = new Cast($4, $2); }
+      | TAKE lvalue                            { $$ = new Take($2); }
+;
+
+assignment: lvalue '=' expr            { $$ = new Assign($1, $3); }
+          | lvalue STAR_EQUAL expr     { $$ = new CompoundAssign($1, '*', $3); }
+          | lvalue SLASH_EQUAL expr    { $$ = new CompoundAssign($1, '/', $3); }
+          | lvalue PERCENT_EQUAL expr  { $$ = new CompoundAssign($1, '%', $3); }
+          | lvalue PLUS_EQUAL expr     { $$ = new CompoundAssign($1, '+', $3); }
+          | lvalue MINUS_EQUAL expr    { $$ = new CompoundAssign($1, '-', $3); }
+          | lvalue AND_EQUAL expr      { $$ = new CompoundAssign($1, '&', $3); }
+          | lvalue OR_EQUAL expr       { $$ = new CompoundAssign($1, '|', $3); }
+;
+
+expr:    unary                         { $$ = $1; }
+        | expr '*' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr '/' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr '%' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr '+' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr '-' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr OP_LEFT_SHIFT expr      { $$ = new Binary($1, $2, $3);  }
+        | expr OP_RIGHT_SHIFT expr     { $$ = new Binary($1, $2, $3);  }
+        | expr '<' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr '>' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr OP_LE expr              { $$ = new Binary($1, $2, $3);  }
+        | expr OP_GE expr              { $$ = new Binary($1, $2, $3);  }
+        | expr IS base_type            { $$ = new Is($1, $3);  }
+        | expr AS base_type            { $$ = new As($1, $3);  }
+        | expr OP_EQUAL expr           { $$ = new Equality($1, $2, $3);  }
+        | expr OP_NE expr              { $$ = new Equality($1, $2, $3);  }
+        | expr '&' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr '|' expr                { $$ = new Binary($1, $2, $3);  }
+        | expr OP_AND expr             { $$ = new LogicalOp($1, $2, $3);  }
+        | expr OP_OR expr              { $$ = new LogicalOp($1, $2, $3);  }
+        | expr '?' expr ':' expr       { $$ = new Conditional($1, $3, $5);  }
+        | assignment                   { $$ = $1; }
+;
+
+expr_opt:          { $$ = null; }
+           | expr  { $$ = $1; }
+;           
+
+// Statements
+
+variable_initializer_opt:                { $$ = null; }
+                              | '=' expr { $$ = $2; }
+;                          
+
+variable_declaration: type ID variable_initializer_opt  { $$ = new VariableDeclaration($1, $2, $3); } 
+;
+
+multiple_variable_declaration: variable_declaration  { $$ = $1; } 
+                             | multiple_variable_declaration ',' ID variable_initializer_opt
+                                 { $*1.Add($3, $4); $$ = $1; }
+;
+
+declaration_statement: multiple_variable_declaration ';'   { $$ = $1; }
+;
+
+expression_statement:  invocation                 { $$ = new ExpressionStatement($1); }
+                     | object_creation_expression { $$ = new ExpressionStatement($1); }
+                     | assignment                 { $$ = new ExpressionStatement($1); }
+                     | post_increment_expression  { $$ = new ExpressionStatement($1); }
+                     | post_decrement_expression  { $$ = new ExpressionStatement($1); }
+                     | pre_increment_expression   { $$ = new ExpressionStatement($1); }
+                     | pre_decrement_expression   { $$ = new ExpressionStatement($1); }
+;                     
+
+expression_statement_opt:                         { $$ = null; }
+                           | expression_statement { $$ = $1; }
+;                           
+
+any_close_paren: ')'
+               | CAST_CLOSE_PAREN
+;           
+
+if_statement: IF '(' expr any_close_paren embedded_statement                          { $$ = new If($3, $5, null); }
+            | IF '(' expr any_close_paren embedded_statement ELSE embedded_statement  { $$ = new If($3, $5, $7); }
+;            
+
+switch_label:  CASE expr ':'    { $$ = $2; }
+             | DEFAULT   ':'    { $$ = null; }
+;             
+
+switch_labels:  switch_label                     { ArrayList ^a = new ArrayList(); a.Add($1); $$ = a; }
+              | switch_labels switch_label       { $*1.Add($2); $$ = $1; }
+;
+
+switch_section: switch_labels statement_list     { $$ = new SwitchSection($1, $2); }
+;
+
+switch_sections:                                      { $$ = new ArrayList(); }
+                  | switch_sections switch_section    { $*1.Add($2);  $$ = $1; }
+;
+
+switch_statement: SWITCH '(' expr ')' '{' switch_sections '}'  { $$ = new Switch($3, $6); }
+;
+
+while_statement: WHILE '(' expr any_close_paren embedded_statement  { $$ = new While($3, $5); }
+;
+
+do_statement: DO embedded_statement WHILE '(' expr ')' ';'  { $$ = new Do($2, $5); }
+;
+
+for_initializer_opt:                          { $$ = null; }
+                     | variable_declaration   { $$ = $1; }
+                     | expression_statement   { $$ = $1; }
+;               
+
+for_statement: FOR '(' for_initializer_opt ';' expr_opt ';' expression_statement_opt any_close_paren embedded_statement
+                   { $$ = new For($3, $5, $7, $9); }
+;
+
+foreach_statement: FOREACH '(' type ID IN_TOKEN expr any_close_paren embedded_statement
+                   { $$ = new ForEach($3, $4, $6, $8); }
+;
+
+return_statement: RETURN ';'          { $$ = new Return(null); }
+                | RETURN expr ';'     { $$ = new Return($2); }
+;                
+
+embedded_statement:  block                       { $$ = $1; }
+                   | ';'                         { $$ = new EmptyStatement(); }
+                   | expression_statement ';'    { $$ = $1; }
+                   | if_statement                { $$ = $1; }
+                   | switch_statement            { $$ = $1; }
+                   | while_statement             { $$ = $1; }
+                   | do_statement                { $$ = $1; }
+                   | for_statement               { $$ = $1; }
+                   | foreach_statement           { $$ = $1; }
+                   | BREAK ';'                   { $$ = new Break(); }
+                   | CONTINUE ';'                { $$ = new Continue(); }
+                   | return_statement            { $$ = $1; }
+;                   
+
+statement: declaration_statement         { $$ = $1; }
+         | embedded_statement            { $$ = $1; }
+;
+
+statement_list: statement           { StatementList ^sl = new StatementList(); sl.Add($1); $$ = sl; }
+       | statement_list statement   { $*1.Add($2);  $$ = $1; }
+;
+
+statement_list_opt:                     { $$ = new StatementList(); }
+                     | statement_list   { $$ = $1; }
+;                     
+
+block: '{' statement_list_opt '}'       { $$ = new Block($2); }
+;
+
+// Fields
+
+attributes:                          { $$ = 0; }
+            | attributes ABSTRACT    { $$ = $1 | Attribute.Abstract; }
+            | attributes CONST_TOKEN { $$ = $1 | Attribute.Const; }
+            | attributes EXTERN      { $$ = $1 | Attribute.Extern; }
+            | attributes OVERRIDE    { $$ = $1 | Attribute.Override; }
+            | attributes PRIVATE     { $$ = $1 | Attribute.Private; }
+            | attributes PROTECTED   { $$ = $1 | Attribute.Protected; }
+            | attributes PUBLIC      { $$ = $1 | Attribute.Public; }
+            | attributes READONLY    { $$ = $1 | Attribute.ReadOnly; }
+            | attributes REF         { $$ = $1 | Attribute.Ref; }
+            | attributes STATIC      { $$ = $1 | Attribute.Static; }
+            | attributes VIRTUAL     { $$ = $1 | Attribute.Virtual; }
+;                   
+
+field_initializer_opt:                            { $$ = null; }
+                          | '=' expr              { $$ = $2; }
+                          | '=' array_initializer { $$ = $2; }
+;                          
+
+field_declarations: attributes type ID field_initializer_opt
+                      { ArrayList ^a = new ArrayList(); a.Add(Field.New($1, $2, $3, $4)); $$ = a; }
+                  | field_declarations ',' ID field_initializer_opt
+                      { Field first = (Field) $*1[0];
+                        $*1.Add(Field.New(first.attributes_, first.type_expr_.Copy(), $3, $4));
+                        $$ = $1; }
+;
+
+field_declaration: field_declarations ';'   { $$ = $1; }
+;
+
+// Methods
+
+parameter_modifier_opt:          { $$ = 0; }
+                        | REF    { $$ = Mode.Ref; }
+                        | OUT_TOKEN    { $$ = Mode.Out; }
+;                    
+
+parameter: parameter_modifier_opt type ID    { $$ = Parameter.New($1, $2, $3); }
+;
+
+parameter_list: parameter  { ArrayList ^a = new ArrayList();  a.Add($1);  $$ = a;}
+              | parameter_list ',' parameter  { $*1.Add($3);  $$ = $1; }
+;              
+
+parameter_list_opt:                   { $$ = new ArrayList(); }
+                    | parameter_list  { $$ = $1; }
+;                    
+
+method_body: block    { $$ = $1; }
+           | ';'      { $$ = new Block(null); }
+;           
+
+base_or_this: BASE     { $$ = true; }
+            | THIS_TOKEN     { $$ = false; }
+;           
+
+method_declaration: attributes type ID '(' parameter_list_opt ')' method_body
+                      { $$ = new Method($1, $2, $3, $5, $7); }
+                  | attributes VOID_TOKEN ID '(' parameter_list_opt ')' method_body 
+                      { $$ = new Method($1, new TypeLiteral(Void.type_), $3, $5, $7); }
+;
+
+property_declaration: attributes type ID '{' ID method_body '}'
+                         { $$ = new Property($1, $2, $3, $5, $6, null, null); }
+                    | attributes type ID '{' ID method_body ID method_body '}'
+                         { $$ = new Property($1, $2, $3, $5, $6, $7, $8); }
+;
+
+indexer_declaration: attributes type THIS_TOKEN '[' parameter ']' '{' ID method_body '}'
+                         { $$ = new Indexer($1, $2, $5, $8, $9, null, null); }
+                   | attributes type THIS_TOKEN '[' parameter ']' '{' ID method_body ID method_body '}'
+                         { $$ = new Indexer($1, $2, $5, $8, $9, $10, $11); }
+;                   
+
+constructor_declaration: attributes ID '(' parameter_list_opt ')' method_body
+                          { $$ = new Constructor($1, $2, $4, $6); }
+                       | attributes ID '(' parameter_list_opt ')' ':' base_or_this '(' argument_list_opt ')' method_body
+                          { $$ = new Constructor($1, $2, $4, $7, $9, $11); }
+;
+
+// Classes
+
+class_base_opt:                { $$ = null; }
+                 | ':' ID      { $$ = $2; }
+
+class_declaration_start: attributes CLASS ID class_base_opt '{'
+           {
+           int i = $1;
+           string s = $3;
+           string t = $4;
+           $$ = new ClassPtr(Class.New(i, s, t));
+           }
+                       | class_declaration_start field_declaration
+                          { for (int i = 0 ; i < $*2.Count ; ++i)
+                              $*1.class_.Add((Field) $*2.Take(i));
+                            $$ = $1; }
+                       | class_declaration_start method_declaration      { $*1.class_.Add($2); $$ = $1; }
+                       | class_declaration_start property_declaration    { $*1.class_.Add($2); $$ = $1; }
+                       | class_declaration_start indexer_declaration     { $*1.class_.Add($2); $$ = $1; }
+                       | class_declaration_start constructor_declaration { $*1.class_.AddConstructor($2); $$ = $1; }
+;
+
+class_declaration: class_declaration_start '}'       { $$ = $1; }
+;
+
+// Program
+
+program_header:
+               | program_header IMPORT STRING_LITERAL ';' { GEL2.program_.FindAndImport($3); }
+;         
+
+program: program_header
+       | program class_declaration   { GEL2.program_.Add($2.class_); }
+;
+
+%%
+
+}

@@ -1,0 +1,158 @@
+class NonOwningArrayList {
+  object[] ^a_ = new object[8];
+  int count_ = 0;
+
+  public int Count { get { return count_; } }
+
+  public object this[int index] {
+    get { return a_[index]; }
+    set { a_[index] = value; }
+  }
+
+  public void Add(object o) {
+    if (count_ == a_.Length) {
+      object[] ^b = new object[a_.Length * 2];
+      a_.CopyTo(b, 0);
+      a_ = b;
+    }
+    a_[count_++] = o;
+  }
+
+  public void RemoveAt(int index) {
+    Debug.Assert(index >= 0 && index < count_);
+    Array.Copy(a_, index + 1, a_, index, count_ - (index + 1));
+    --count_;
+  }
+
+  public void Clear() {
+    for (int i = 0; i < count_; ++i)
+      a_[i] = null;
+    count_ = 0;
+  }
+}
+
+class ArrayList {
+  object^[] ^a_ = new object^[8];
+  int count_ = 0;
+
+  public int Count { get { return count_; } }
+
+  public object this[int index] {
+    get { return a_[index]; }
+  }
+
+  public object ^Take(int index) {
+    return take a_[index];
+  }
+
+  public void Add(object ^o) {
+    if (count_ == a_.Length) {
+      object^[] ^b = new object^[a_.Length * 2];
+      for (int i = 0 ; i < count_ ; ++i)
+        b[i] = take a_[i];
+      a_ = b;
+    }
+    a_[count_++] = o;
+  }
+
+  public void Clear() {
+    for (int i = 0; i < count_; ++i)
+      a_[i] = null;
+    count_ = 0;
+  }
+}
+
+class Bucket {
+  public readonly object key_;
+  public object ^value_;
+  public Bucket ^next_;
+
+  public Bucket(object key, object ^value, Bucket ^next) {
+    key_ = key;
+    value_ = value;
+    next_ = next;
+  }
+}
+
+// A hash table with chaining, using the multiplication method (see Cormen et al,
+// Introduction to Algorithms, 2nd edition, 11.3.2) to map hash values to buckets.  We use
+// the constant A which Cormen attributes to Knuth.
+
+class OwningHashtable {
+  Bucket^[] ^buckets_ = new Bucket^[8];
+  int p_ = 3;
+  int count_ = 0;   // total number of values in hash table
+
+  // s = (A * 2^32) - 2 ^ 32 , where A = (sqrt(5) - 1) / 2.
+  // We subtract 2 ^ 32 only so that this value fits in a signed 32-bit integer;
+  // that doesn't affect the calculation below since 32-bit multiplication
+  // results in the same bit pattern whether or not the multiplicands are signed.
+  const int s = -1640531527;
+
+  const int grow_factor = 3;
+
+  int IndexFromHash(int hash) {
+    return ((hash * s) >> (32 - p_)) & (buckets_.Length - 1);
+  }
+
+  int Index(object key) {
+    return IndexFromHash(key.GetHashCode());
+  }
+
+  void Grow() {
+    Bucket^[] ^old_buckets = take buckets_;
+    ++p_;
+    buckets_ = new Bucket^[1 << p_];
+    for (int i = 0; i < old_buckets.Length; ++i) {
+      Bucket ^next = null;
+      for (Bucket ^b = take old_buckets[i]; b != null; b = next) {
+        next = take b.next_;
+        int index = Index(b.key_);
+        b.next_ = take buckets_[index];
+        buckets_[index] = b;
+      }
+    }
+  }
+
+  Bucket Find(object key, int bucket) {
+    Bucket b;
+    for (b = buckets_[bucket]; b != null ; b = b.next_)
+      if (b.key_.Equals(key))
+        break;
+    return b;
+  }
+
+  Bucket Find(object key) {
+    return Find(key, Index(key));
+  }
+
+  public object this[object key] {
+    get {
+      Bucket b = Find(key);
+      return b == null ? null : b.value_;
+    }
+  }
+
+  public object ^Take(object key) {
+    Bucket b = Find(key);
+    return b == null ? null : take b.value_;
+  }
+
+  public void Set(object key, object ^value) {
+    if (count_ > grow_factor * buckets_.Length)
+      Grow();
+      
+    int i = Index(key);
+    Bucket b = Find(key, i);
+    if (b != null)
+      b.value_ = value;
+    else {
+      buckets_[i] = new Bucket(key, value, take buckets_[i]);
+      ++count_;
+    }
+  }
+
+  public bool ContainsKey(object key) {
+    return Find(key) != null;
+  }
+}
