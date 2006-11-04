@@ -770,7 +770,7 @@ public:
   static StringPtr ToString(double d) {
     const int kBufSize = 20;
     wchar_t buf[kBufSize];
-    swprintf(buf, kBufSize, L"%.10gel", d);
+    swprintf(buf, kBufSize, L"%.10g", d);
     return new DynamicString(buf, true);
   }
 
