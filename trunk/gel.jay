@@ -1,17 +1,25 @@
 /*
 Copyright (c) 2006 Google Inc.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of 
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+Software, and to permit persons to whom the Software is furnished to do so, subject
+to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all copies
+or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 %{
-using System;
-using System.Collections;
-
 public class Parser {
 %}
 
@@ -154,7 +162,7 @@ public class Parser {
 %type <Indexer> indexer_declaration
 %type <Constructor> constructor_declaration
 %type <string> class_base_opt
-%type <Class> class_declaration_start class_declaration
+%type <ClassPtr> class_declaration_start class_declaration
 
 %start program
 
@@ -176,7 +184,7 @@ class_type:  predefined_type      { $$ = $1; }
 ;           
 
 base_type: class_type           { $$ = $1; }
-         | type ARRAY_TYPE      { $$ = new ArrayTypeExpr($1); }
+           | type ARRAY_TYPE      { $$ = new ArrayTypeExpr($1); }
 ;
 
 type: base_type          { $$ = $1; }
@@ -190,8 +198,8 @@ argument:   expr             { $$ = new InArgument($1); }
           | OUT_TOKEN lvalue       { $$ = new RefOutArgument(Mode.Out, $2); }
 ;          
 
-argument_list:  argument                     { ArrayList a = new ArrayList(); a.Add($1); $$ = a; }
-              | argument_list ',' argument   { $1.Add($3);  $$ = $1; }
+argument_list:  argument                     { ArrayList ^a = new ArrayList(); a.Add($1); $$ = a; }
+              | argument_list ',' argument   { $*1.Add($3);  $$ = $1; }
 ;              
 
 argument_list_opt:                    { $$ = new ArrayList(); }
@@ -205,7 +213,7 @@ invocation: ID '(' argument_list_opt ')'
           | BASE '.' ID '(' argument_list_opt ')'
                 { $$ = new Invocation(new Base(), $3, $5); }
           | predefined_type '.' ID '(' argument_list_opt ')'
-                { $$ = new Invocation(new PredefinedType((Class) $1.type_), $3, $5); }
+              { $$ = new Invocation(new PredefinedType((Class) $1.type_), $3, $5); }
 ;
 
 object_creation_expression: NEW class_type '(' argument_list_opt ')'
@@ -231,8 +239,8 @@ literal:  FALSE_TOKEN                { $$ = new Literal(new GBool(false)); }
         | NULL                       { $$ = new Literal(new Null()); }
 ;        
 
-variable_initializer_list:  expr   { ArrayList list = new ArrayList(); list.Add($1); $$ = list; }
-                          | variable_initializer_list ',' expr  { $1.Add($3); $$ = $1; }
+variable_initializer_list:  expr   { ArrayList ^list = new ArrayList(); list.Add($1); $$ = list; }
+                          | variable_initializer_list ',' expr  { $*1.Add($3); $$ = $1; }
 ;                          
 
 variable_initializer_list_opt:  { $$ = new ArrayList(); }
@@ -329,7 +337,7 @@ variable_declaration: type ID variable_initializer_opt  { $$ = new VariableDecla
 
 multiple_variable_declaration: variable_declaration  { $$ = $1; } 
                              | multiple_variable_declaration ',' ID variable_initializer_opt
-                                 { $1.Add($3, $4); $$ = $1; }
+                                 { $*1.Add($3, $4); $$ = $1; }
 ;
 
 declaration_statement: multiple_variable_declaration ';'   { $$ = $1; }
@@ -360,15 +368,15 @@ switch_label:  CASE expr ':'    { $$ = $2; }
              | DEFAULT   ':'    { $$ = null; }
 ;             
 
-switch_labels:  switch_label                     { ArrayList a = new ArrayList(); a.Add($1); $$ = a; }
-              | switch_labels switch_label       { $1.Add($2); $$ = $1; }
+switch_labels:  switch_label                     { ArrayList ^a = new ArrayList(); a.Add($1); $$ = a; }
+              | switch_labels switch_label       { $*1.Add($2); $$ = $1; }
 ;
 
 switch_section: switch_labels statement_list     { $$ = new SwitchSection($1, $2); }
 ;
 
 switch_sections:                                      { $$ = new ArrayList(); }
-                  | switch_sections switch_section    { $1.Add($2);  $$ = $1; }
+                  | switch_sections switch_section    { $*1.Add($2);  $$ = $1; }
 ;
 
 switch_statement: SWITCH '(' expr ')' '{' switch_sections '}'  { $$ = new Switch($3, $6); }
@@ -415,8 +423,8 @@ statement: declaration_statement         { $$ = $1; }
          | embedded_statement            { $$ = $1; }
 ;
 
-statement_list: statement           { StatementList sl = new StatementList(); sl.Add($1); $$ = sl; }
-       | statement_list statement   { $1.Add($2);  $$ = $1; }
+statement_list: statement           { StatementList ^sl = new StatementList(); sl.Add($1); $$ = sl; }
+       | statement_list statement   { $*1.Add($2);  $$ = $1; }
 ;
 
 statement_list_opt:                     { $$ = new StatementList(); }
@@ -448,10 +456,10 @@ field_initializer_opt:                            { $$ = null; }
 ;                          
 
 field_declarations: attributes type ID field_initializer_opt
-                      { ArrayList a = new ArrayList(); a.Add(Field.New($1, $2, $3, $4)); $$ = a; }
+                      { ArrayList ^a = new ArrayList(); a.Add(Field.New($1, $2, $3, $4)); $$ = a; }
                   | field_declarations ',' ID field_initializer_opt
-                      { Field first = (Field) $1[0];
-                        $1.Add(Field.New(first.attributes_, first.type_expr_, $3, $4));
+                      { Field first = (Field) $*1[0];
+                        $*1.Add(Field.New(first.attributes_, first.type_expr_.Copy(), $3, $4));
                         $$ = $1; }
 ;
 
@@ -468,8 +476,8 @@ parameter_modifier_opt:          { $$ = 0; }
 parameter: parameter_modifier_opt type ID    { $$ = Parameter.New($1, $2, $3); }
 ;
 
-parameter_list: parameter  { ArrayList a = new ArrayList();  a.Add($1);  $$ = a;}
-              | parameter_list ',' parameter  { $1.Add($3);  $$ = $1; }
+parameter_list: parameter  { ArrayList ^a = new ArrayList();  a.Add($1);  $$ = a;}
+              | parameter_list ',' parameter  { $*1.Add($3);  $$ = $1; }
 ;              
 
 parameter_list_opt:                   { $$ = new ArrayList(); }
@@ -513,15 +521,21 @@ constructor_declaration: attributes ID '(' parameter_list_opt ')' method_body
 class_base_opt:                { $$ = null; }
                  | ':' ID      { $$ = $2; }
 
-class_declaration_start: attributes CLASS ID class_base_opt '{'          { $$ = Class.New($1, $3, $4); }
+class_declaration_start: attributes CLASS ID class_base_opt '{'
+           {
+           int i = $1;
+           string s = $3;
+           string t = $4;
+           $$ = new ClassPtr(Class.New(i, s, t));
+           }
                        | class_declaration_start field_declaration
-                          { foreach (Field f in $2)
-                              $1.Add(f);
+                          { for (int i = 0 ; i < $*2.Count ; ++i)
+                              $*1.class_.Add((Field) $*2.Take(i));
                             $$ = $1; }
-                       | class_declaration_start method_declaration      { $1.Add($2); $$ = $1; }
-                       | class_declaration_start property_declaration    { $1.Add($2); $$ = $1; }
-                       | class_declaration_start indexer_declaration     { $1.Add($2); $$ = $1; }
-                       | class_declaration_start constructor_declaration { $1.AddConstructor($2); $$ = $1; }
+                       | class_declaration_start method_declaration      { $*1.class_.Add($2); $$ = $1; }
+                       | class_declaration_start property_declaration    { $*1.class_.Add($2); $$ = $1; }
+                       | class_declaration_start indexer_declaration     { $*1.class_.Add($2); $$ = $1; }
+                       | class_declaration_start constructor_declaration { $*1.class_.AddConstructor($2); $$ = $1; }
 ;
 
 class_declaration: class_declaration_start '}'       { $$ = $1; }
@@ -530,11 +544,11 @@ class_declaration: class_declaration_start '}'       { $$ = $1; }
 // Program
 
 program_header:
-               | program_header IMPORT STRING_LITERAL ';' { GEL2.program_.FindAndImport($3); }
+               | program_header IMPORT STRING_LITERAL ';' { Gel.program_.FindAndImport($3); }
 ;         
 
 program: program_header
-       | program class_declaration   { GEL2.program_.Add($2); }
+       | program class_declaration   { Gel.program_.Add($2.class_); }
 ;
 
 %%

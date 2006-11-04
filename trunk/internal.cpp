@@ -1,11 +1,22 @@
 /*
 Copyright (c) 2006 Google Inc.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of 
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+Software, and to permit persons to whom the Software is furnished to do so, subject
+to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all copies
+or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #define UNICODE
@@ -354,13 +365,13 @@ public:
   }
 
 #if MEMORY_SAFE
-#define GEL2_OBJECT(_Class)        \
+#define GEL_OBJECT(_Class)        \
   DESTROY1(_Class)              \
   virtual size_t _Destroy2() {  \
     return sizeof(_Class);      \
   }
 #else
-#define GEL2_OBJECT(_Class) DESTROY1(_Class)
+#define GEL_OBJECT(_Class) DESTROY1(_Class)
 #endif
 
 class Object : public _Object {
@@ -1190,7 +1201,7 @@ void _Initialize() {
 #endif
 }
 
-void gel2_runmain_args(void (*gmain)(_Array<StringPtr> *), int argc, char *argv[]) {
+void gel_runmain_args(void (*gmain)(_Array<StringPtr> *), int argc, char *argv[]) {
   _assert(argc >= 1, L"main() received no argument");
   _Own<_CopyableArray<StringPtr> > a(new _CopyableArray<StringPtr>(&typeid(String *), argc - 1));
 #if _WINDOWS
@@ -1210,14 +1221,14 @@ void gel2_runmain_args(void (*gmain)(_Array<StringPtr> *), int argc, char *argv[
   gmain(a.Get());
 }
 
-int gel2_runmain2(void (*gmain)(), void (*gmain_a)(_Array<StringPtr > *), int argc, char *argv[]) {
+int gel_runmain2(void (*gmain)(), void (*gmain_a)(_Array<StringPtr > *), int argc, char *argv[]) {
 #if _MSC_VER
   __try {
 #endif
     _Initialize();
     if (gmain)
       gmain();
-    else gel2_runmain_args(gmain_a, argc, argv);
+    else gel_runmain_args(gmain_a, argc, argv);
     _exiting = true;
 #if _MSC_VER
   } __except(_exception_filter(GetExceptionInformation())) {
@@ -1227,10 +1238,10 @@ int gel2_runmain2(void (*gmain)(), void (*gmain_a)(_Array<StringPtr > *), int ar
   return 0;
 }
 
-int gel2_runmain(void (*gmain)()) {
-  return gel2_runmain2(gmain, 0, 0, 0);
+int gel_runmain(void (*gmain)()) {
+  return gel_runmain2(gmain, 0, 0, 0);
 }
 
-int gel2_runmain(void (*gmain)(_Array<StringPtr > *), int argc, char *argv[]) {
-  return gel2_runmain2(0, gmain, argc, argv);
+int gel_runmain(void (*gmain)(_Array<StringPtr > *), int argc, char *argv[]) {
+  return gel_runmain2(0, gmain, argc, argv);
 }

@@ -1,4 +1,4 @@
-all: jay\src\jay.exe debug\dlmalloc.obj release\dlmalloc.obj gel2a.exe
+all: jay\src\jay.exe debug\dlmalloc.obj release\dlmalloc.obj gela.exe
 
 jay\src\jay.exe:
 	$(MAKE) -C jay\src jay
@@ -9,23 +9,23 @@ debug\dlmalloc.obj:
 release\dlmalloc.obj:
   cl /nologo /c /D "USE_DL_PREFIX" /W3 /Fo"release\\" dlmalloc.c 
 
-gel2.tab.cs: gel2_cs.jay
-	jay\src\jay -cv gel2_cs.jay < jay\cs\skeleton.cs > gel2.tab.cs
+gel.tab.cs: gel_cs.jay
+	jay\src\jay -cv gel_cs.jay < jay\cs\skeleton.cs > gel.tab.cs
 
-gel2.exe: gel2.cs gel2.tab.cs
-	csc /nologo gel2.cs gel2.tab.cs
+gel.exe: gel.cs gel.tab.cs
+	csc /nologo gel.cs gel.tab.cs
 
-gel2.tab.gel2: gel2.jay
-	jay\src\jay -cov gel2.jay < jay\gel2\skeleton.gel2 > gel2.tab.gel2
+gel.tab.gel: gel.jay
+	jay\src\jay -cov gel.jay < jay\gel2\skeleton.gel > gel.tab.gel
 
-gel2a.exe: gel2.exe gel2.gel2 gel2.tab.gel2
-	gel2 -c -d -o gel2a gel2.gel2
+gela.exe: gel.exe gel.gel gel.tab.gel
+	gel -c -d -v -o gela gel.gel
 
-gel2b.exe: gel2a.exe gel2.gel2 gel2.tab.c
-	gel2a -c -d -o gel2b gel2.gel2
+gelb.exe: gela.exe gel.gel gel.tab.c
+	gela -c -d -v -o gelb gel.gel
 
-helloworld: helloworld.gel2
-	gel2 -c -d -o helloworld helloworld.gel2
+helloworld: helloworld.gel
+	gel -c -d -v -o helloworld helloworld.gel
 
 clean:
-	del *.exe gel2.tab.gel2 gel2.tab.cs gel2a.cpp gel2b.cpp helloworld.cpp y.output
+	del *.exe gel.tab.gel gel.tab.cs gela.cpp gelb.cpp helloworld.cpp y.output

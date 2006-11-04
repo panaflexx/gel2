@@ -1,29 +1,42 @@
 /*
 Copyright (c) 2006 Google Inc.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of 
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+Software, and to permit persons to whom the Software is furnished to do so, subject
+to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all copies
+or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-import "gel2_collection.gel2";
-
-import "jay/gel2/jay.gel2";
-import "gel2.tab.gel2";
+using System;
+using System.Collections;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Text;
 
 class Syntax {
   public readonly string file_;
   public readonly int line_;
 
-  public Syntax() { file_ = GEL2.CurrentFile(); line_ = GEL2.Line(); }
+  public Syntax() { file_ = Gel.CurrentFile(); line_ = Gel.Line(); }
 
   static void Report(string file, int line, string type) {
     Console.Write("{0}({1}): ", file, line);
     Console.Write("{0}: ", type);
-    if (GEL2.error_test_)
-      GEL2.error_lines_.Add(line);
+    if (Gel.error_test_)
+      Gel.error_lines_.Add(line);
   }
 
   public void Error(string message) {
@@ -54,7 +67,6 @@ class Syntax {
 
 abstract class TypeExpr : Syntax {
   public abstract GType Resolve(Program program);
-  public abstract TypeExpr ^Copy();
 }
 
 class ConversionContext {
@@ -103,8 +115,6 @@ abstract class GType {
         return true;
     return false;
   }
-
-  public virtual Owning OwningType() { Debug.Assert(false); return null; }
 
   protected virtual bool CanConvertOwnership(GType t, int context) {
     bool from_owning = this is Owning;
@@ -196,7 +206,7 @@ abstract class GType {
 
   public abstract SimpleValue DefaultValue();
 
-  static ArrayList ^empty_array_ = new ArrayList();
+  static ArrayList empty_array_ = new ArrayList();
   public virtual ArrayList /* of Member */ Members() { return empty_array_; }
 
   public Member GetMatchingMember(Member m1) {
@@ -302,7 +312,7 @@ abstract class GType {
   }
 
   string EmitNonOwningPointer(string name) {
-    if (GEL2.program_.safe_)
+    if (Gel.program_.safe_)
       return ConstructType(this == GObject.type_ ? "_PtrRef" : "_Ptr", name);
     return String.Format("{0} *", name);
   }
@@ -327,9 +337,9 @@ abstract class GType {
 }
 
 class TypeSet {
-  NonOwningArrayList /* of GType */ ^types_ = new NonOwningArrayList();
+  ArrayList /* of GType */ types_ = new ArrayList();
 
-  public static readonly TypeSet ^empty_ = new TypeSet();
+  public static readonly TypeSet empty_ = new TypeSet();
 
   public void Add(GType type) {
     for (int i = 0; i < types_.Count; ++i) {
@@ -367,7 +377,7 @@ class TypeSet {
   }
 
   public override string ToString() {
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     sb.Append("{");
     foreach (GType t in types_)
       sb.AppendFormat(" {0}", t.ToString());
@@ -388,52 +398,40 @@ class VoidType : GType {
 }
 
 class Void {
-  public static readonly GType ^type_ = new VoidType();
+  public static readonly GType type_ = new VoidType();
 }
 
-// an RValue, a Location containing an RValue, or a LocationRef pointing to a Location containing an RValue
-abstract class ValueOrLocation {
-  public abstract GValue Get();
-}
+// a GValue or a Location containing a GValue
+abstract class ValueOrLocation { }
 
-// a GValue or a reference to a GValue
-abstract class RValue : ValueOrLocation {
-  public abstract RValue ^CopyRef();
-}
-
-abstract class GValue : RValue {
-  public override GValue Get() { return this; }
-
+abstract class GValue : ValueOrLocation {
   public abstract GType Type();
 
-  public override RValue ^CopyRef() { return new Reference(this); }
+  public virtual GValue Get(Field field) { Debug.Assert(false); return null; }
 
-  public virtual RValue ^Get(Field field) { Debug.Assert(false); return null; }
-  public virtual RValue ^Take(Field field) { Debug.Assert(false); return null; }
-
-  public virtual RValue ^ConvertExplicit(ref RValue ^this_own, GType t) {
+  public virtual GValue ConvertExplicit(GType t) {
     // try implicit conversion
-    RValue ^v = Convert(ref this_own, t);
+    GValue v = Convert(t);
     if (v != this || Type().IsSubtype(t) )
       return v;
 
     Console.WriteLine("type cast failed: object of type {0} is not a {1}", Type(), t);
-    GEL2.Exit();
+    Gel.Exit();
     return null;
   }
 
   // Implicitly convert this value to type t.
-  public virtual RValue ^Convert(ref RValue ^this_own, GType t) {
-    return take this_own;
+  public virtual GValue Convert(GType t) {
+    return this;
   }
 
   public virtual bool DefaultEquals(object o) { return Equals(o); }
   public virtual int DefaultHashCode() { return GetHashCode(); }
   public virtual string DefaultToString() { return ToString(); }
 
-  public virtual RValue ^Invoke(Method m, ValueList args) {
+  public virtual GValue Invoke(Method m, ValueList args) {
     switch (m.name_) {
-      case "Equals": return new GBool(DefaultEquals(args.Object(0)));
+      case "Equals": return new GBool(DefaultEquals(args.Object()));
       case "GetHashCode": return new GInt(DefaultHashCode());
       case "ToString": return new GString(DefaultToString());
       default: Debug.Assert(false); return null;
@@ -441,19 +439,7 @@ abstract class GValue : RValue {
   }
 }
 
-class Reference : RValue {
-  public readonly GValue value_;    // a reference value, never a SimpleValue
-
-  public Reference(GValue v) { value_ = v; }
-
-  public override GValue Get() { return value_; }
-
-  public override RValue ^CopyRef() { return new Reference(value_); }
-}
-
 abstract class SimpleValue : GValue {
-  public abstract SimpleValue ^Copy();
-  public override RValue ^CopyRef() { return Copy(); }
   public abstract string Emit();
 }
 
@@ -469,9 +455,7 @@ class GBool : SimpleValue {
 
   public override int GetHashCode() { return b_.GetHashCode(); }
 
-  public override SimpleValue ^Copy() { return new GBool(b_); }
-
-  public static readonly BoolClass ^type_ = new BoolClass();
+  public static readonly BoolClass type_ = new BoolClass();
 
   public override GType Type() { return type_; }
 
@@ -485,7 +469,7 @@ class GInt : SimpleValue {
 
   public GInt(int i) { i_ = i; }
 
-  public static readonly IntClass ^type_ = new IntClass();
+  public static readonly IntClass type_ = new IntClass();
 
   public override GType Type() { return type_; }
 
@@ -496,18 +480,16 @@ class GInt : SimpleValue {
 
   public override int GetHashCode() { return i_.GetHashCode(); }
 
-  public override SimpleValue ^Copy() { return new GInt(i_); }
-
-  public override RValue ^Convert(ref RValue ^this_own, GType t) {
+  public override GValue Convert(GType t) {
     if (t == GFloat.type_)
       return new GFloat(i_);
     if (t == GDouble.type_)
       return new GDouble(i_);
-    return base.Convert(ref this_own, t);
+    return base.Convert(t);
   }
 
-  public override RValue ^ConvertExplicit(ref RValue ^this_own, GType t) {
-    return t == GChar.type_ ? new GChar((char) i_) : base.ConvertExplicit(ref this_own, t);
+  public override GValue ConvertExplicit(GType t) {
+    return t == GChar.type_ ? new GChar((char) i_) : base.ConvertExplicit(t);
   }
 
   public override string ToString() { return i_.ToString(); }
@@ -520,7 +502,7 @@ class GFloat : SimpleValue {
 
   public GFloat(float f) { f_ = f; }
 
-  public static readonly FloatClass ^type_ = new FloatClass();
+  public static readonly FloatClass type_ = new FloatClass();
 
   public override GType Type() { return type_; }
 
@@ -531,16 +513,14 @@ class GFloat : SimpleValue {
 
   public override int GetHashCode() { return f_.GetHashCode(); }
 
-  public override SimpleValue ^Copy() { return new GFloat(f_); }
-
-  public override RValue ^Convert(ref RValue ^this_own, GType t) {
+  public override GValue Convert(GType t) {
     if (t == GDouble.type_)
       return new GDouble(f_);
-    return base.Convert(ref this_own, t);
+    return base.Convert(t);
   }
 
-  public override RValue ^ConvertExplicit(ref RValue ^this_own, GType t) {
-    return t == GInt.type_ ? new GInt((int) f_) : base.ConvertExplicit(ref this_own, t);
+  public override GValue ConvertExplicit(GType t) {
+    return t == GInt.type_ ? new GInt((int) f_) : base.ConvertExplicit(t);
   }
 
   public override string ToString() { return f_.ToString(); }
@@ -556,7 +536,7 @@ class GDouble : SimpleValue {
 
   public GDouble(double d) { d_ = d; }
 
-  public static readonly DoubleClass ^type_ = new DoubleClass();
+  public static readonly DoubleClass type_ = new DoubleClass();
 
   public override GType Type() { return type_; }
 
@@ -567,14 +547,12 @@ class GDouble : SimpleValue {
 
   public override int GetHashCode() { return d_.GetHashCode(); }
 
-  public override SimpleValue ^Copy() { return new GDouble(d_); }
-
-  public override RValue ^ConvertExplicit(ref RValue ^this_own, GType t) {
+  public override GValue ConvertExplicit(GType t) {
     if (t == GInt.type_)
       return new GInt((int) d_);
     if (t == GFloat.type_)
       return new GFloat((float) d_);
-    return base.ConvertExplicit(ref this_own, t);
+    return base.ConvertExplicit(t);
   }
 
   public override string ToString() { return d_.ToString(); }
@@ -592,7 +570,7 @@ class GChar : SimpleValue {
 
   public GChar(char c) { c_ = c; }
 
-  public static readonly CharClass ^type_ = new CharClass();
+  public static readonly CharClass type_ = new CharClass();
 
   public override GType Type() { return type_; }
 
@@ -603,10 +581,8 @@ class GChar : SimpleValue {
 
   public override int GetHashCode() { return c_.GetHashCode(); }
 
-  public override SimpleValue ^Copy() { return new GChar(c_); }
-
-  public override RValue ^Convert(ref RValue ^this_own, GType t) {
-    return t == GInt.type_ ? new GInt(c_) : base.Convert(ref this_own, t);
+  public override GValue Convert(GType t) {
+    return t == GInt.type_ ? new GInt(c_) : base.Convert(t);
   }
 
   public override string ToString() { return c_.ToString(); }
@@ -632,43 +608,24 @@ class GChar : SimpleValue {
   }
 }
 
-abstract class LocationOrRef : ValueOrLocation {
-  public abstract Location GetLoc();
-}
+class Location : ValueOrLocation {
+  public GValue value_;
 
-class Location : LocationOrRef {
-  public RValue ^value_;
-
-  public Location(RValue ^val) { value_ = val; }
-
-  public override GValue Get() { return value_.Get(); }
-
-  public override Location GetLoc() { return this; }
-}
-
-// We allocate a LocationRef when we need an owning reference to a Location which we don't own.
-class LocationRef : LocationOrRef {
-  public readonly Location location_;
-
-  public LocationRef(Location loc) { location_ = loc; }
-
-  public override GValue Get() { return location_.Get(); }
-
-  public override Location GetLoc() { return location_; }
+  public Location(GValue val) { value_ = val; }
 }
 
 class MapNode {
-  public readonly MapNode ^next_;
+  public readonly MapNode next_;
   public readonly object key_;
-  public ValueOrLocation ^value_;   // (must appear after next_ so it will be destroyed first)
+  public ValueOrLocation value_;
 
-  public MapNode(object key, ValueOrLocation ^value, MapNode ^next) {
+  public MapNode(object key, ValueOrLocation value, MapNode next) {
     key_ = key; value_ = value; next_ = next;
   }
 }
 
 class Map {
-  MapNode ^nodes_;
+  MapNode nodes_;
 
   protected MapNode Find1(object key) {
     for (MapNode n = nodes_; n != null; n = n.next_)
@@ -683,38 +640,32 @@ class Map {
     return n;
   }
 
-  public RValue ^Get(object key) {
-    return Find(key).value_.Get().CopyRef();
+  public GValue Get(object key) {
+    ValueOrLocation o = Find(key).value_;
+    Location loc = o as Location;
+    return loc != null ? loc.value_ : (GValue) o;
   }
 
-  public RValue ^Take(object key) {
+  public void Set(object key, GValue val) {
     MapNode n = Find(key);
-    LocationOrRef l = n.value_ as LocationOrRef;
-    if (l != null)
-      return take l.GetLoc().value_;
-    return (RValue) take n.value_;
-  }
-
-  public void Set(object key, RValue ^val) {
-    MapNode n = Find(key);
-    LocationOrRef l = n.value_ as LocationOrRef;
-    if (l != null)
-      l.GetLoc().value_ = val;
+    Location loc = n.value_ as Location;
+    if (loc != null)
+      loc.value_ = val;
     else n.value_ = val;
   }
 
-  public void Add(object key, ValueOrLocation ^val) {
-    nodes_ = new MapNode(key, val, take nodes_);
+  public void Add(object key, ValueOrLocation val) {
+    nodes_ = new MapNode(key, val, nodes_);
   }
 
   public Location GetLocation(object key) {
     MapNode n = Find(key);
-    LocationOrRef l = n.value_ as LocationOrRef;
-    if (l != null)
-      return l.GetLoc();
-    Location ^loc1 = new Location((RValue) take n.value_);
-    Location loc = loc1;
-    n.value_ = loc1;
+    ValueOrLocation o = n.value_;
+    Location loc = o as Location;
+    if (loc != null)
+      return loc;
+    loc = new Location((GValue) o);
+    n.value_ = loc;
     return loc;
   }
 }
@@ -722,13 +673,13 @@ class Map {
 class GObject : GValue {
   public readonly Class class_;   // the class of this object
 
-  Map ^map_ = new Map();
+  Map map_ = new Map();
 
   public GObject(Class cl) {
     class_ = cl;
     while (cl != null) {
       foreach (Field f in cl.fields_)
-        map_.Add(f, f.Type().DefaultValue().Copy() );
+        map_.Add(f, f.Type().DefaultValue());
       cl = cl.Parent();
     }
   }
@@ -736,14 +687,13 @@ class GObject : GValue {
   // the type of this object
   public override GType Type() { return class_; }
 
-  public override RValue ^Get(Field field) { return map_.Get(field); }
-  public override RValue ^Take(Field field) { return map_.Take(field); }
-  public void Set(Field field, RValue ^val) { map_.Set(field, val); }
+  public override GValue Get(Field field) { return map_.Get(field); }
+  public void Set(Field field, GValue val) { map_.Set(field, val); }
   public Location GetLocation(Field field) { return map_.GetLocation(field); }
 
   public override int DefaultHashCode() { return base.GetHashCode(); }
   public override int GetHashCode() {
-    GInt ^i = (GInt) Invocation.InvokeMethod(this, GObject.type_.get_hash_code_, new ArrayList(), true);
+    GInt i = (GInt) Invocation.InvokeMethod(this, GObject.type_.get_hash_code_, new ArrayList(), true);
     return i.i_;
   }
 
@@ -753,20 +703,20 @@ class GObject : GValue {
     if (v == null)
       return false;
 
-    ArrayList ^args = new ArrayList();
-    args.Add(v.CopyRef());
-    GBool ^b = (GBool) Invocation.InvokeMethod(this, GObject.type_.equals_, args, true);
+    ArrayList args = new ArrayList();
+    args.Add(v);
+    GBool b = (GBool) Invocation.InvokeMethod(this, GObject.type_.equals_, args, true);
     return b.b_;
   }
 
   public override string DefaultToString() { return String.Format("<object {0}>", class_.name_); }
   public override string ToString() {
-    GString ^s = (GString) Invocation.InvokeMethod(this, GObject.type_.to_string_, new ArrayList(), true);
+    GString s = (GString) Invocation.InvokeMethod(this, GObject.type_.to_string_, new ArrayList(), true);
     return s.s_;
   }
 
   // the Object class
-  public static readonly ObjectClass ^type_ = new ObjectClass();
+  public static readonly ObjectClass type_ = new ObjectClass();
 }
 
 class NullType : GType {
@@ -788,7 +738,7 @@ class NullType : GType {
 class Null : SimpleValue {
   public Null() { }
 
-  public static readonly NullType ^type_ = new NullType();
+  public static readonly NullType type_ = new NullType();
 
   public override GType Type() { return type_; }
 
@@ -796,11 +746,9 @@ class Null : SimpleValue {
     return o is Null;
   }
 
-  public override SimpleValue ^Copy() { return new Null(); }
-
   public override int GetHashCode() { return 0; }
 
-  public static readonly Null ^Instance = new Null();
+  public static readonly Null Instance = new Null();
 
   public override string ToString() { return ""; }
 
@@ -857,11 +805,9 @@ class Owning : GType {
 }
 
 class OwningExpr : TypeExpr {
-  readonly TypeExpr ^expr_;
+  readonly TypeExpr expr_;
 
-  public OwningExpr(TypeExpr ^expr) { expr_ = expr; }
-
-  public override TypeExpr ^Copy() { return new OwningExpr(expr_.Copy()); }
+  public OwningExpr(TypeExpr expr) { expr_ = expr; }
 
   public override GType Resolve(Program program) {
     GType t = expr_.Resolve(program);
@@ -871,7 +817,7 @@ class OwningExpr : TypeExpr {
       Error("^ cannot be applied to primitive types or strings");
       return null;
     }
-    return t.OwningType();
+    return new Owning(t);
   }
 }
 
@@ -880,7 +826,7 @@ class GString : SimpleValue {
 
   public GString(string s) { s_ = s; }
 
-  public static readonly StringClass ^type_ = new StringClass();
+  public static readonly StringClass type_ = new StringClass();
 
   public override GType Type() { return type_; }
 
@@ -889,18 +835,16 @@ class GString : SimpleValue {
     return s != null && s.s_ == s_;
   }
 
-  public override SimpleValue ^Copy() { return new GString(s_); }
-
   public override int GetHashCode() { return s_.GetHashCode(); }
 
   public override string ToString() { return s_; }
 
-  public override RValue ^Invoke(Method m, ValueList args) {
+  public override GValue Invoke(Method m, ValueList args) {
     if (m.GetClass() != type_)
       return base.Invoke(m, args);
     switch (m.name_) {
-      case "StartsWith": return new GBool(s_.StartsWith(args.GetString(0)));
-      case "EndsWith": return new GBool(s_.EndsWith(args.GetString(0)));
+      case "StartsWith": return new GBool(s_.StartsWith(args.GetString()));
+      case "EndsWith": return new GBool(s_.EndsWith(args.GetString()));
       default: Debug.Assert(false); return null;
     }
   }
@@ -910,7 +854,7 @@ class GString : SimpleValue {
   }
 
   public static string EmitString(string s) {
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     sb.Append('"');
     for (int i = 0; i < s.Length; ++i)
       sb.Append(GChar.Emit(s[i]));
@@ -925,17 +869,7 @@ class GString : SimpleValue {
   }
 }
 
-abstract class Ownable : GType {
-  Owning ^owning_type_;
-
-  public override Owning OwningType() {
-    if (owning_type_ == null)
-      owning_type_ = new Owning(this);
-    return owning_type_;
-  }
-}
-
-class ArrayType : Ownable {
+class ArrayType : GType {
   GType element_type_;
 
   public ArrayType(GType type) {
@@ -976,54 +910,45 @@ class ArrayType : Ownable {
 }
 
 class ArrayTypeExpr : TypeExpr {
-  readonly TypeExpr ^expr_;
-  GType ^type_;
+  readonly TypeExpr expr_;
 
-  public ArrayTypeExpr(TypeExpr ^expr) { expr_ = expr; }
-
-  public override TypeExpr ^Copy() { return new ArrayTypeExpr(expr_.Copy()); }
+  public ArrayTypeExpr(TypeExpr expr) { expr_ = expr; }
 
   public override GType Resolve(Program program) {
     GType t = expr_.Resolve(program);
-    return t == null ? null : (type_ = new ArrayType(t));
+    return t == null ? null : new ArrayType(t);
   }
 }
 
 class GArray : GValue {
   ArrayType type_;
 
-  ValueOrLocation^[] ^elements_;   // each element is a GValue or a Location
+  ValueOrLocation[] elements_;   // each element is a GValue or a Location
 
   public override GType Type() { return type_; }
 
   public GArray(ArrayType type, int count) {
     type_ = type;
-    elements_ = new ValueOrLocation^[count];
+    elements_ = new ValueOrLocation[count];
     for (int i = 0 ; i < count ; ++i)
-      elements_[i] = type_.ElementType().DefaultValue().Copy();
+      elements_[i] = type_.ElementType().DefaultValue();
   }
 
   void CheckIndex(int index) {
     if (index < 0 || index >= elements_.Length) {
       Console.WriteLine("error: array access out of bounds");
-      GEL2.Exit();
+      Gel.Exit();
     }
   }
 
-  public RValue ^Get(int index) {
+  public GValue Get(int index) {
     CheckIndex(index);
-    return elements_[index].Get().CopyRef();
+    ValueOrLocation o = elements_[index];
+    Location loc = o as Location;
+    return loc != null ? loc.value_ : (GValue) o;
   }
 
-  public RValue ^Take(int index) {
-    CheckIndex(index);
-    Location loc = elements_[index] as Location;
-    if (loc != null)
-      return take loc.value_;
-    return (RValue) (take elements_[index]);
-  }
-
-  public void Set(int index, RValue ^val) {
+  public void Set(int index, GValue val) {
     CheckIndex(index);
     Location loc = elements_[index] as Location;
     if (loc != null)
@@ -1033,35 +958,29 @@ class GArray : GValue {
 
   public Location GetLocation(int index) {
     CheckIndex(index);
-    Location loc = elements_[index] as Location;
+    ValueOrLocation o = elements_[index];
+    Location loc = o as Location;
     if (loc != null)
       return loc;
-    Location ^loc1 = new Location((RValue) take elements_[index]);
-    loc = loc1;
-    elements_[index] = loc1;
+    loc = new Location((GValue) o);
+    elements_[index] = loc;
     return loc;
   }
 
-  public static readonly ArrayClass ^array_class_ = new ArrayClass();
+  public static readonly ArrayClass array_class_ = new ArrayClass();
 
-  public override RValue ^Invoke(Method m, ValueList args) {
+  public override GValue Invoke(Method m, ValueList args) {
     if (m.GetClass() != array_class_)
       return base.Invoke(m, args);
     switch (m.name_) {
       case "CopyTo":
-        GArray a = (GArray) args.Object(0);
+        GArray a = (GArray) args.Object();
         if (!type_.Equals(a.type_)) {
-          Console.WriteLine("error: can't copy between arrays of different types");
-          GEL2.Exit();
-        }
-        if (a.type_.ElementType() is Owning) {
-          Console.WriteLine("error: can't copy to owning array");
-          GEL2.Exit();
+          Console.WriteLine("can't copy between arrays of different types");
+          Gel.Exit();
         }
         // should check for index out of bounds here!
-        int dest = args.Int(1);
-        for (int i = 0 ; i < elements_.Length ; ++i)
-          a.Set(dest + i, Get(i));
+        elements_.CopyTo(a.elements_, args.Int());
         return null;
       case "get_Length":
         return new GInt(elements_.Length);
@@ -1074,8 +993,7 @@ class GArray : GValue {
 // A control graph object representing temporary variables destroyed when a top-level
 // expression completes evaluation. 
 class Temporaries : Node {
-  NonOwningArrayList /* of GType */ ^types_ = new NonOwningArrayList();
-  TypeSet ^destroys_;
+  ArrayList /* of GType */ types_ = new ArrayList();
 
   public void Add(GType t) {
     Debug.Assert(t is Owning);
@@ -1083,12 +1001,10 @@ class Temporaries : Node {
   }
 
   public override TypeSet NodeDestroys() {
-    if (destroys_ == null) {
-      destroys_ = new TypeSet();
+    TypeSet set = new TypeSet();
     foreach (GType t in types_)
-        destroys_.Add(t.TypeDestroys());
-    }
-    return destroys_;
+      set.Add(t.TypeDestroys());
+    return set;
   }
 }
 
@@ -1101,7 +1017,7 @@ class Context {
   public Local var_;    // chain of local variable declarations
 
   // subexpressions of the current top-level expression possibly yielding temporary objects
-  NonOwningArrayList /* of Expression */ ^temporaries_ = new NonOwningArrayList();
+  ArrayList /* of Expression */ temporaries_ = new ArrayList();
 
   public Context(Program program) { program_ = program; }
 
@@ -1165,7 +1081,7 @@ class Context {
     foreach (Expression e in temporaries_)
       if (!e.LosesOwnership()) {
         if (t == null)
-          t = class_.NewTemporaries();
+          t = new Temporaries();
         t.Add(e.TemporaryType());
       }
     if (t != null)
@@ -1191,7 +1107,7 @@ class Env : Map {
     return null;
   }
 
-  public static readonly Env ^static_ = new Env((GValue) null);
+  public static readonly Env static_ = new Env((GValue) null);
 }
 
 class TypeLiteral : TypeExpr {
@@ -1202,8 +1118,6 @@ class TypeLiteral : TypeExpr {
   public override GType Resolve(Program program) {
     return type_;
   }
-
-  public override TypeExpr ^Copy() { return new TypeLiteral(type_); }
 }
 
 class TypeName : TypeExpr {
@@ -1217,8 +1131,6 @@ class TypeName : TypeExpr {
       Error("unknown type: {0}", name_);
     return type;
   }
-
-  public override TypeExpr ^Copy() { return new TypeName(name_); }
 }
 
 abstract class Traverser {
@@ -1240,7 +1152,7 @@ abstract class Control : Syntax {
 
   // A node representing unreachability.  We could represent this using null, but it's
   // clearer to have this be explicit. 
-  public static readonly Node ^unreachable_ = new Node();
+  public static readonly Node unreachable_ = new Node();
 
   // A helper function for Traverse.  If we return true then we should cut the
   // traversal at this point.
@@ -1318,7 +1230,7 @@ class Node : Control {
 }
 
 class Joiner : Control {
-  NonOwningArrayList /* of Control */ ^prev_ = new NonOwningArrayList();
+  ArrayList /* of Control */ prev_ = new ArrayList();
 
   public void Join(Control c) {
     Debug.Assert(c != null);
@@ -1341,14 +1253,14 @@ class Joiner : Control {
   // Once we've finished merging paths into a Joiner, if the Joiner points to only a single path
   // then as an optimization we can discard the Joiner and just use that path instead.
   public Control Combine() {
-    switch (prev_.Count) {
+    ArrayList p = prev_;
+    switch (p.Count) {
       case 0:
         prev_ = null;
         return unreachable_;
       case 1:
-        Control c = (Control) prev_[0];
         prev_ = null;
-        return c;
+        return (Control) p[0];
       default: return this;
     }
   }
@@ -1475,7 +1387,7 @@ abstract class Expression : Node {
     Debug.Assert(end_ != null);
   }
 
-  public abstract RValue ^Eval(Env env);
+  public abstract GValue Eval(Env env);
 
   public bool Check(Context ctx, GType t2) {
     GType t = Check(ctx);
@@ -1487,20 +1399,9 @@ abstract class Expression : Node {
     return t == null ? false : t.CheckConvert(this, t2);
   }
 
-  public RValue ^Eval(Env env, GType t) {
-    RValue ^r = Eval(env);
-    GValue v = r.Get();
-    return v.Convert(ref r, t);
-  }
-
+  public GValue Eval(Env env, GType t) { return Eval(env).Convert(t); }
   public bool EvalBool(Env env) { return ((GBool) Eval(env)).b_; }
-
-  public int EvalInt(Env env) {
-    RValue ^r = Eval(env, GInt.type_);
-    GInt i = (GInt) r;
-    return i.i_;
-  }
-
+  public int EvalInt(Env env) { return ((GInt) Eval(env, GInt.type_)).i_; }
   public double EvalDouble(Env env) { return ((GDouble) Eval(env, GDouble.type_)).d_; }
   public float EvalFloat(Env env) { return ((GFloat) Eval(env, GFloat.type_)).f_; }
   public string EvalString(Env env) { return ((GString) Eval(env)).s_; }
@@ -1545,7 +1446,7 @@ abstract class Expression : Node {
   public abstract string Emit();    // return a C++ expression representing this GEL2 expression
 
   public bool NeedsRef(GType type) {
-    return GEL2.program_.safe_ && type.IsOwned() && ExpressionTraverser.NeedRef(start_, end_, this, type);
+    return Gel.program_.safe_ && type.IsOwned() && ExpressionTraverser.NeedRef(start_, end_, this, type);
   }
 
   // Emit this expression, adding a reference-counting _Ptr wrapper if needed.
@@ -1637,7 +1538,7 @@ abstract class Expression : Node {
   protected string OwnSuffix(GType t) {
     if (t is Owning)
       return LosesOwnership() ? ".Take()" : ".Get()";
-    if (t == GString.type_ || GEL2.program_.safe_ && t.IsReference() )
+    if (t == GString.type_ || Gel.program_.safe_ && t.IsReference() )
       return ".Get()";
     return "";
   }
@@ -1661,9 +1562,9 @@ abstract class Expression : Node {
 }
 
 class Literal : Expression {
-  public readonly SimpleValue ^value_;
+  public readonly SimpleValue value_;
 
-  public Literal(SimpleValue ^v) { value_ = v; }
+  public Literal(SimpleValue v) { value_ = v; }
 
   public override bool IsTrueLiteral() {
     GBool b = value_ as GBool;
@@ -1677,7 +1578,7 @@ class Literal : Expression {
 
   public override GType Check(Context ctx) { return value_.Type(); }
 
-  public override RValue ^Eval(Env env) { return value_.Copy(); }
+  public override GValue Eval(Env env) { return value_; }
 
   public override bool IsConstant() { return true; }
 
@@ -1687,7 +1588,7 @@ class Literal : Expression {
 // An LValue is an expression which can be assigned to: a Name, Dot, or Sub.
 //
 // In the control graph, an LValue represents a read; if an LValue is written then
-// some other node (e.gel2. an Assign) will appear representing the write.
+// some other node (e.g. an Assign) will appear representing the write.
 abstract class LValue : Expression {
   public override GType Check(Context ctx) {
     return Check(ctx, true, false, false);
@@ -1714,25 +1615,25 @@ abstract class LValue : Expression {
   // us evaluate the left side of an assignment expression before evaluating the right side,
   // and also lets us get and then set an indexer without evaluating its expression twice.
 
-  public abstract void Eval1(Env env, out RValue ^v1, out RValue ^v2);
-  public abstract RValue ^EvalGet(Env env, RValue ^v1, RValue ^v2);
-  public abstract void EvalSet(Env env, RValue ^v1, RValue ^v2, RValue ^val);
-  public abstract Location EvalLocation(Env env, RValue ^v1, RValue ^v2);
+  public abstract void Eval1(Env env, out GValue v1, out GValue v2);
+  public abstract GValue EvalGet(Env env, GValue v1, GValue v2);
+  public abstract void EvalSet(Env env, GValue v1, GValue v2, GValue val);
+  public abstract Location EvalLocation(Env env, GValue v1, GValue v2);
 
-  public override RValue ^Eval(Env env) {
-    RValue ^val1, val2;
+  public override GValue Eval(Env env) {
+    GValue val1, val2;
     Eval1(env, out val1, out val2);
     return EvalGet(env, val1, val2);
   }
 
-  public void EvalSet(Env env, RValue ^v) {
-    RValue ^val1, val2;
+  public void EvalSet(Env env, GValue v) {
+    GValue val1, val2;
     Eval1(env, out val1, out val2);
     EvalSet(env, val1, val2, v);
   }
 
   public Location EvalLocation(Env env) {
-    RValue ^val1, val2;
+    GValue val1, val2;
     Eval1(env, out val1, out val2);
     return EvalLocation(env, val1, val2);
   }
@@ -1809,21 +1710,19 @@ class Name : LValue {
 
   public override PropertyOrIndexer GetPropertyOrIndexer() { return field_ as Property; }
 
-  public override void Eval1(Env env, out RValue ^v1, out RValue ^v2) { v1 = v2 = null; }
+  public override void Eval1(Env env, out GValue v1, out GValue v2) { v1 = v2 = null; }
 
-  public override RValue ^EvalGet(Env env, RValue ^v1, RValue ^v2) {
-    if (LosesOwnership() && StorageType() is Owning)
-      return local_ != null ? env.Take(local_) : field_.Take(env.this_);
-    else return local_ != null ? env.Get(local_) : field_.Get(env.this_);
+  public override GValue EvalGet(Env env, GValue v1, GValue v2) {
+    return local_ != null ? env.Get(local_) : field_.Get(env.this_);
   }
 
-  public override void EvalSet(Env env, RValue ^v1, RValue ^v2, RValue ^val) {
+  public override void EvalSet(Env env, GValue v1, GValue v2, GValue val) {
     if (local_ != null)
       env.Set(local_, val);
     else field_.Set((GObject) env.this_, val);
   }
 
-  public override Location EvalLocation(Env env, RValue ^v1, RValue ^v2) {
+  public override Location EvalLocation(Env env, GValue v1, GValue v2) {
     return local_ != null ? env.GetLocation(local_) : field_.GetLocation((GObject) env.this_);
   }
 
@@ -1854,9 +1753,9 @@ class Name : LValue {
 }
 
 class Parenthesized : Expression {
-  Expression ^expr_;
+  Expression expr_;
 
-  public Parenthesized(Expression ^e) { expr_ = e; }
+  public Parenthesized(Expression e) { expr_ = e; }
 
   public override GType Check(Context ctx) { return expr_.Check(ctx); }
 
@@ -1865,7 +1764,7 @@ class Parenthesized : Expression {
     expr_.LoseOwnership();
   }
 
-  public override RValue ^Eval(Env env) { return expr_.Eval(env); }
+  public override GValue Eval(Env env) { return expr_.Eval(env); }
 
   public override string Emit() { return String.Format("({0})", expr_.Emit()); }
 }
@@ -1886,19 +1785,19 @@ class PredefinedType : Expression {
     return ExprKind.Type;
   }
 
-  public override RValue ^Eval(Env env) { Debug.Assert(false); return null; }
+  public override GValue Eval(Env env) { Debug.Assert(false); return null; }
 
   public override string Emit() { return type_.name_; }
 }
 
 class Dot : LValue {
-  Expression ^expr_;  // set to null for a static invocation
+  Expression expr_;  // set to null for a static invocation
   GType expr_type_;
   string name_;
 
   LMember field_;
 
-  public Dot(Expression ^expr, string name) { expr_ = expr; name_ = name; }
+  public Dot(Expression expr, string name) { expr_ = expr; name_ = name; }
 
   public override bool IsConstant() {
     Debug.Assert(field_ != null);   // make sure we were already type checked
@@ -1952,28 +1851,26 @@ class Dot : LValue {
 
   public override PropertyOrIndexer GetPropertyOrIndexer() { return field_ as Property; }
 
-  public override void Eval1(Env env, out RValue ^v1, out RValue ^v2) {
+  public override void Eval1(Env env, out GValue v1, out GValue v2) {
     v1 = v2 = null;
-    if (expr_ != null) {  // instance field
+    if (expr_ != null) {  // calling instance method
       v1 = expr_.Eval(env);
       if (v1 is Null) {
         Error("attempted to access field of null object");
-        GEL2.Exit();
+        Gel.Exit();
       }
     }
   }
 
-  public override RValue ^EvalGet(Env env, RValue ^v1, RValue ^v2) {
-    GValue obj = v1 == null ? null : v1.Get();
-    return LosesOwnership() && field_.Type() is Owning ? field_.Take(obj) : field_.Get(obj);
+  public override GValue EvalGet(Env env, GValue v1, GValue v2) {
+    return field_.Get(v1);
   }
 
-  public override void EvalSet(Env env, RValue ^v1, RValue ^v2, RValue ^val) {
-    GObject obj = v1 == null ? null : (GObject) v1.Get();
-    field_.Set(obj, val);
+  public override void EvalSet(Env env, GValue v1, GValue v2, GValue val) {
+    field_.Set((GObject) v1, val);
   }
 
-  public override Location EvalLocation(Env env, RValue ^v1, RValue ^v2) {
+  public override Location EvalLocation(Env env, GValue v1, GValue v2) {
     return field_.GetLocation((GObject) v1);
   }
 
@@ -2024,15 +1921,15 @@ abstract class Argument : Node {
   public abstract bool Check(Context ctx);
   public abstract void FinishCall(Context ctx);
 
-  public abstract void AddEval(ArrayList a, Env env, GType t);
+  public abstract ValueOrLocation Eval(Env env, GType t);
 
   public abstract string Emit(GType t);
 }
 
 class InArgument : Argument {
-  public readonly Expression ^expr_;
+  public readonly Expression expr_;
 
-  public InArgument(Expression ^expr) { expr_ = expr; }
+  public InArgument(Expression expr) { expr_ = expr; }
   public InArgument(GType type) { type_ = type; }
 
   public override int GetMode() { return 0; }
@@ -2047,9 +1944,7 @@ class InArgument : Argument {
     expr_.ReleaseRef(ctx);
   }
 
-  public override void AddEval(ArrayList a, Env env, GType t) {
-    a.Add(expr_.Eval(env, t));
-  }
+  public override ValueOrLocation Eval(Env env, GType t) { return expr_.Eval(env, t); }
 
   public override string Emit(GType t) {
     return expr_.EmitRef(type_, t);
@@ -2058,9 +1953,9 @@ class InArgument : Argument {
 
 class RefOutArgument : Argument {
   public readonly int mode_;
-  public readonly LValue ^lvalue_;
+  public readonly LValue lvalue_;
 
-  public RefOutArgument(int mode, LValue ^lvalue) { mode_ = mode; lvalue_ = lvalue; }
+  public RefOutArgument(int mode, LValue lvalue) { mode_ = mode; lvalue_ = lvalue; }
 
   public override int GetMode() { return mode_; }
 
@@ -2085,22 +1980,20 @@ class RefOutArgument : Argument {
 
   public GType StorageType() { return lvalue_.StorageType(); }
 
-  public override void AddEval(ArrayList a, Env env, GType t) {
-    a.Add(new LocationRef(lvalue_.EvalLocation(env)));
-  }
+  public override ValueOrLocation Eval(Env env, GType t) { return lvalue_.EvalLocation(env); }
 
   public override string Emit(GType t) { return lvalue_.EmitLocation(); }
 }
 
 class Invocation : Expression {
-  Expression ^obj_;    // may be null
+  Expression obj_;    // may be null
   GType obj_type_;
   string name_;
-  ArrayList /* of Argument */ ^arguments_;
+  ArrayList /* of Argument */ arguments_;
 
   Method method_;
 
-  public Invocation(Expression ^obj, string name, ArrayList ^arguments) {
+  public Invocation(Expression obj, string name, ArrayList arguments) {
     obj_ = obj; name_ = name; arguments_ = arguments;
   }
 
@@ -2185,7 +2078,7 @@ class Invocation : Expression {
 
   public override Method Calls() { return method_; }
 
-  public static RValue ^InvokeMethod(GValue obj, Method m, ArrayList /* of RValue */ values,
+  public static GValue InvokeMethod(GValue obj, Method m, ArrayList /* of GValue */ values,
                                     bool virtual_ok) {
     if (m.IsVirtual() && virtual_ok) {
       GType t = obj.Type();
@@ -2195,20 +2088,19 @@ class Invocation : Expression {
     return m.Invoke(obj, values);
   }
 
-  public static RValue ^CallMethod(Env env, GValue obj,
+  public static GValue CallMethod(Env env, GValue obj,
                                   Method m, ArrayList /* of Argument */ args,
                                   bool virtual_ok) {
-    ArrayList /* of ValueOrLocation */ ^values = new ArrayList();
+    ArrayList /* of ValueOrLocation */ values = new ArrayList();
     int i;
     for (i = 0 ; i < args.Count ; ++i) {
       Argument a = (Argument) args[i];
-      a.AddEval(values, env, m.Param(i).Type());
+      values.Add(a.Eval(env, m.Param(i).Type()));
     }
     return InvokeMethod(obj, m, values, virtual_ok);
   }
 
-  public RValue ^Eval(Env env, Expression obj, Method m, ArrayList /* of Argument */ args) {
-    RValue ^r;
+  public GValue Eval(Env env, Expression obj, Method m, ArrayList /* of Argument */ args) {
     GValue v;
     if (m.IsStatic())
       v = null;
@@ -2216,11 +2108,10 @@ class Invocation : Expression {
       if (obj == null)
         v = env.this_;
       else {
-        r = obj.Eval(env);
-        v = r.Get();
+        v = obj.Eval(env);
         if (v is Null) {
           Error("attempted to call method on null object");
-          GEL2.Exit();
+          Gel.Exit();
         }
       }
     }
@@ -2228,12 +2119,12 @@ class Invocation : Expression {
     return CallMethod(env, v, m, args, !(obj is Base));
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     return Eval(env, obj_, method_, arguments_);
   }
 
   public static string EmitArguments(Method m, ArrayList /* of Argument */ arguments) {
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     Debug.Assert(m.parameters_.Count == arguments.Count);
     for (int i = 0; i < arguments.Count; ++i) {
       if (i > 0)
@@ -2245,7 +2136,7 @@ class Invocation : Expression {
   }
 
   public override string Emit() {
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     if (obj_ != null) {
       if (method_.IsStatic())
         sb.AppendFormat("{0}::", obj_.Emit());
@@ -2260,15 +2151,15 @@ class Invocation : Expression {
 
 // an expression of the form a[b]
 class Sub : LValue {
-  readonly Expression ^base_;
+  readonly Expression base_;
   GType base_type_;
-  readonly Expression ^index_;
+  readonly Expression index_;
   GType index_type_;
 
   GType element_type_;    // for array accesses; null for indexers
   Indexer indexer_;
 
-  public Sub(Expression ^base_exp, Expression ^index) { base_ = base_exp; index_ = index; }
+  public Sub(Expression base_exp, Expression index) { base_ = base_exp; index_ = index; }
 
   public override GType Check(Context ctx, bool read, bool write, bool type_ok) {
     base_type_ = base_.CheckAndHold(ctx);
@@ -2290,7 +2181,7 @@ class Sub : LValue {
       return element_type_.BaseType();
     }
 
-    ArrayList ^arguments = new ArrayList();
+    ArrayList arguments = new ArrayList();
     arguments.Add(new InArgument(index_type_));
 
     indexer_ = (Indexer) base_type_.Lookup(this, ctx.class_, base_ is Base,
@@ -2323,44 +2214,39 @@ class Sub : LValue {
 
   public override PropertyOrIndexer GetPropertyOrIndexer() { return indexer_; }
 
-  public override void Eval1(Env env, out RValue ^v1, out RValue ^v2) {
+  public override void Eval1(Env env, out GValue v1, out GValue v2) {
     v1 = base_.Eval(env);
     if (v1 is Null) {
       Error("attempted array or indexer access through null");
-      GEL2.Exit();
+      Gel.Exit();
     }
     v2 = index_.Eval(env);
   }
 
-  int Index(RValue ^v) {
-    // ++ We get an ownership error if we combine the following two lines into one; why?
-    v = v.Get().Convert(ref v, GInt.type_);
-    return ((GInt) v).i_;
+  int Index(GValue v) {
+    return ((GInt) v.Convert(GInt.type_)).i_;
   }
 
-  public override RValue ^EvalGet(Env env, RValue ^v1, RValue ^v2) {
-    if (indexer_ == null) {
-      GArray arr = (GArray) v1.Get();
-      int i = Index(v2);
-      return LosesOwnership() && element_type_ is Owning ? arr.Take(i) : arr.Get(i);
-    }
-    ArrayList ^args = new ArrayList();
+  public override GValue EvalGet(Env env, GValue v1, GValue v2) {
+    if (indexer_ == null)
+      return ((GArray) v1).Get(Index(v2));
+    ArrayList args = new ArrayList();
     args.Add(v2);
-    return Invocation.InvokeMethod(v1.Get(), indexer_.Getter(), args, true);
+    return Invocation.InvokeMethod(v1, indexer_.Getter(), args, true);
   }
 
-  public override void EvalSet(Env env, RValue ^v1, RValue ^v2, RValue ^val) {
+  public override void EvalSet(Env env, GValue v1, GValue v2, GValue val) {
     if (indexer_ == null) {
-      ((GArray) v1.Get()).Set(Index(v2), val);
+      ((GArray) v1).Set(Index(v2), val);
       return;
     }
-    ArrayList ^args = new ArrayList();
+    ArrayList args = new ArrayList();
     args.Add(v2);
     args.Add(val);
-    Invocation.InvokeMethod(v1.Get(), indexer_.Setter(), args, true);
+    Invocation.InvokeMethod(v1, indexer_.Setter(), args, true);
   }
 
-  public override Location EvalLocation(Env env, RValue ^v1, RValue ^v2) {
+  public override Location EvalLocation(Env env, GValue v1, GValue v2) {
     int i = ((GInt) v2).i_;
     return ((GArray) v1).GetLocation(i);
   }
@@ -2402,8 +2288,8 @@ class This : Expression {
     return ctx.class_;
   }
 
-  public override RValue ^Eval(Env env) {
-    return new Reference(env.this_);
+  public override GValue Eval(Env env) {
+    return env.this_;
   }
 
   public override string Emit() { return "this"; }
@@ -2425,8 +2311,8 @@ class Base : Expression {
     return parent_;
   }
 
-  public override RValue ^Eval(Env env) {
-    return new Reference(env.this_);
+  public override GValue Eval(Env env) {
+    return env.this_;
   }
 
   public override string Emit() { return "this"; }
@@ -2437,21 +2323,21 @@ class Base : Expression {
 }
 
 class New : Expression {
-  Expression ^creator_;    // either a pool or null
-  TypeExpr ^type_expr_;
-  ArrayList /* of Expression */ ^arguments_;
+  Expression creator_;    // either a pool or null
+  TypeExpr type_expr_;
+  ArrayList /* of Expression */ arguments_;
 
   Class class_;
   Constructor constructor_;
 
-  public New(Expression ^creator, TypeExpr ^expr, ArrayList ^arguments) {
+  public New(Expression creator, TypeExpr expr, ArrayList arguments) {
     creator_ = creator;
     type_expr_ = expr;
     arguments_ = arguments;
   }
 
   GType Type() {
-    return creator_ == null ? (GType) class_.OwningType() : class_;
+    return creator_ == null ? (GType) new Owning(class_) : class_;
   }
 
   public override GType TemporaryType() { return Type(); }    
@@ -2492,8 +2378,8 @@ class New : Expression {
 
   public override Method Calls() { return constructor_; }
 
-  public override RValue ^Eval(Env env) {
-    GValue ^obj = class_.New();
+  public override GValue Eval(Env env) {
+    GValue obj = class_.New();
     Invocation.CallMethod(env, obj, constructor_, arguments_, false);
     return obj;
   }
@@ -2508,9 +2394,9 @@ class New : Expression {
 }
 
 class ArrayInitializer : Expression {
-  public readonly ArrayList /* of Expression */ ^initializers_;
+  public readonly ArrayList /* of Expression */ initializers_;
 
-  public ArrayInitializer(ArrayList ^initializers) { initializers_ = initializers; }
+  public ArrayInitializer(ArrayList initializers) { initializers_ = initializers; }
 
   public override GType Check(Context ctx) {
     Error("only static fields may have array initializers");
@@ -2524,10 +2410,10 @@ class ArrayInitializer : Expression {
     return true;
   }
 
-  public override RValue ^Eval(Env env) { Debug.Assert(false); return null; }
+  public override GValue Eval(Env env) { Debug.Assert(false); return null; }
 
-  public GArray ^Eval(ArrayType type) {
-    GArray ^a = new GArray(type, initializers_.Count);
+  public GArray Eval(ArrayType type) {
+    GArray a = new GArray(type, initializers_.Count);
     for (int i = 0; i < initializers_.Count; ++i) {
       Expression e = (Expression) initializers_[i];
       a.Set(i, e.Eval(Env.static_, type.ElementType()));
@@ -2556,7 +2442,7 @@ class ArrayInitializer : Expression {
         }
       }
       Expression e = (Expression) initializers_[i];
-      SimpleValue ^v = (SimpleValue) e.Eval(Env.static_);
+      SimpleValue v = (SimpleValue) e.Eval(Env.static_);
       w.Write(v.Emit());
     }
     if (count > per_row) {
@@ -2568,20 +2454,20 @@ class ArrayInitializer : Expression {
 }
 
 class NewArray : Expression {
-  TypeExpr ^element_type_expr_;
+  TypeExpr element_type_expr_;
   int dimensions_;
-  ArrayType ^array_type_;
+  ArrayType array_type_;
 
-  Expression ^count_;
+  Expression count_;
 
-  public NewArray(TypeExpr ^element_type_expr, int dimensions, Expression ^count) {
+  public NewArray(TypeExpr element_type_expr, int dimensions, Expression count) {
     element_type_expr_ = element_type_expr;
     dimensions_ = dimensions;
     count_ = count;
   }
 
   GType Type() {
-    return (GType) array_type_.OwningType();
+    return (GType) new Owning(array_type_);
   }
 
   public override GType TemporaryType() { return Type(); }
@@ -2592,7 +2478,7 @@ class NewArray : Expression {
       return null;
     }
     for (int i = 0; i < dimensions_; ++i)
-      element_type_expr_ = new ArrayTypeExpr(take element_type_expr_);
+      element_type_expr_ = new ArrayTypeExpr(element_type_expr_);
     GType element_type = element_type_expr_.Resolve(ctx.program_);
     if (element_type == null)
       return null;
@@ -2607,7 +2493,7 @@ class NewArray : Expression {
     return t;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     return new GArray(array_type_, count_.EvalInt(env));
   }
 
@@ -2622,9 +2508,9 @@ class NewArray : Expression {
 }
 
 abstract class Unary : Expression {
-  protected Expression ^exp_;
+  protected Expression exp_;
 
-  protected Unary(Expression ^e) { exp_ = e; }
+  protected Unary(Expression e) { exp_ = e; }
 
   public override bool IsConstant() { return exp_.IsConstant(); }
 }
@@ -2633,7 +2519,7 @@ abstract class Unary : Expression {
 class Minus : Unary {
   GType type_;
 
-  public Minus(Expression ^e) : base(e) { }
+  public Minus(Expression e) : base(e) { }
 
   public override GType Check(Context ctx) {
     type_ = exp_.Check(ctx);
@@ -2644,7 +2530,7 @@ class Minus : Unary {
     return type_;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     if (type_ == GInt.type_) {
     int i = exp_.EvalInt(env);
     return new GInt(-i);
@@ -2665,13 +2551,13 @@ class Minus : Unary {
 }
 
 class Not : Unary {
-  public Not(Expression ^e) : base(e) { }
+  public Not(Expression e) : base(e) { }
 
   public override GType Check(Context ctx) {
     return exp_.Check(ctx, GBool.type_) ? GBool.type_ : null;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     bool b = exp_.EvalBool(env);
     return new GBool(!b);
   }
@@ -2681,13 +2567,13 @@ class Not : Unary {
 
 // the bitwise complement (~) operator
 class Complement : Unary {
-  public Complement(Expression ^e) : base(e) { }
+  public Complement(Expression e) : base(e) { }
 
   public override GType Check(Context ctx) {
     return exp_.Check(ctx, GInt.type_) ? GInt.type_ : null;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     int i = exp_.EvalInt(env);
     return new GInt(~i);
   }
@@ -2698,9 +2584,9 @@ class Complement : Unary {
 class IncDec : Expression {
   bool pre_;    // true for pre-increment/decrement; false for post-increment/decrement
   bool inc_;
-  LValue ^lvalue_;
+  LValue lvalue_;
 
-  public IncDec(bool pre, bool inc, LValue ^lvalue) { pre_ = pre; inc_ = inc; lvalue_ = lvalue; }
+  public IncDec(bool pre, bool inc, LValue lvalue) { pre_ = pre; inc_ = inc; lvalue_ = lvalue; }
 
   public override GType Check(Context ctx) {
     // We don't bother to store a node in the control graph indicating that this lvalue
@@ -2720,11 +2606,12 @@ class IncDec : Expression {
     return GInt.type_;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     Location loc = lvalue_.EvalLocation(env);
-    GInt ^i = (GInt) take loc.value_;
-    loc.value_ = new GInt(inc_ ? i.i_ + 1 : i.i_ - 1);
-    return pre_ ? ((GInt) loc.value_).Copy() : i;
+    GInt i = (GInt) loc.value_;
+    GInt j = new GInt(inc_ ? i.i_ + 1 : i.i_ - 1);
+    loc.value_ = j;
+    return pre_ ? j : i;
   }
 
   string EmitOp() { return inc_ ? "++" : "--"; }
@@ -2735,13 +2622,13 @@ class IncDec : Expression {
 }
 
 abstract class Conversion : Expression {
-  protected Expression ^expr_;
-  protected TypeExpr ^type_expr_;
+  protected Expression expr_;
+  protected TypeExpr type_expr_;
 
   protected GType from_base_;
   protected GType to_type_, to_base_;
 
-  protected Conversion(Expression ^expr, TypeExpr ^type_expr) {
+  protected Conversion(Expression expr, TypeExpr type_expr) {
     expr_ = expr; type_expr_ = type_expr;
   }
 
@@ -2756,7 +2643,7 @@ abstract class Conversion : Expression {
       return false;
     if (!to_base_.IsValue() &&
        (from is Owning || from_base_.IsValue()))
-      to_type_ = to_base_.OwningType();
+      to_type_ = new Owning(to_base_);
     else to_type_ = to_base_;
 
     if (!from.CanConvertExplicit(to_type_, subtype_only)) {
@@ -2768,7 +2655,7 @@ abstract class Conversion : Expression {
 }
 
 class Cast : Conversion {
-  public Cast(Expression ^expr, TypeExpr ^type_expr) : base(expr, type_expr) { }
+  public Cast(Expression expr, TypeExpr type_expr) : base(expr, type_expr) { }
 
   public override Local GetLocal() { return expr_.GetLocal(); }
   
@@ -2785,9 +2672,8 @@ class Cast : Conversion {
     expr_.LoseOwnership();
   }
 
-  public override RValue ^Eval(Env env) {
-    RValue ^r = expr_.Eval(env);
-    return r.Get().ConvertExplicit(ref r, to_base_);
+  public override GValue Eval(Env env) {
+    return expr_.Eval(env).ConvertExplicit(to_base_);
   }
 
   public override string Emit() {
@@ -2797,13 +2683,13 @@ class Cast : Conversion {
 
 class Binary : Expression {
   int op_;
-  Expression ^left_, right_;
+  Expression left_, right_;
   GType left_type_, right_type_;
   GType type_;
 
   const int CONCATENATE = 0;
 
-  public Binary(Expression ^left, int op, Expression ^right) {
+  public Binary(Expression left, int op, Expression right) {
     left_ = left; op_ = op; right_ = right;
   }
 
@@ -2883,7 +2769,7 @@ class Binary : Expression {
     }
   }
 
-  public static GBool ^BoolOp(bool x, int op, bool y) {
+  public static GBool BoolOp(bool x, int op, bool y) {
     switch (op) {
       case '&': return new GBool(x & y);
       case '|': return new GBool(x | y);
@@ -2891,7 +2777,7 @@ class Binary : Expression {
     }
   }
 
-  public static GValue ^IntOp(int x, int op, int y) {
+  public static GValue IntOp(int x, int op, int y) {
     switch (op) {
       case '*': return new GInt(x * y);
       case '/': return new GInt(x / y);
@@ -2910,7 +2796,7 @@ class Binary : Expression {
     }
   }
 
-  public static GValue ^FloatOp(float x, int op, float y) {
+  public static GValue FloatOp(float x, int op, float y) {
     switch (op) {
       case '*': return new GFloat(x * y);
       case '/': return new GFloat(x / y);
@@ -2924,7 +2810,7 @@ class Binary : Expression {
     }
   }
 
-  public static GValue ^DoubleOp(double x, int op, double y) {
+  public static GValue DoubleOp(double x, int op, double y) {
     switch (op) {
       case '*': return new GDouble(x * y);
       case '/': return new GDouble(x / y);
@@ -2938,7 +2824,7 @@ class Binary : Expression {
     }
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     if (op_ == CONCATENATE)
       return new GString(left_.Eval(env).ToString() + right_.Eval(env).ToString());
 
@@ -2980,10 +2866,10 @@ class Binary : Expression {
 
 class Equality : Expression {
   bool equal_;    // true for ==, false for !=
-  Expression ^left_, right_;
+  Expression left_, right_;
   GType left_type_, right_type_, type_;
 
-  public Equality(Expression ^left, int op, Expression ^right) {
+  public Equality(Expression left, int op, Expression right) {
     left_ = left;
     switch (op) {
       case Parser.OP_EQUAL: equal_ = true; break;
@@ -3007,10 +2893,10 @@ class Equality : Expression {
     return type_ == null ? null : GBool.type_;
   }
 
-  public override RValue ^Eval(Env env) {
-    RValue ^left = left_.Eval(env, type_);
-    RValue ^right = right_.Eval(env, type_);
-    bool eq = left.Get().DefaultEquals(right.Get());
+  public override GValue Eval(Env env) {
+    GValue left = left_.Eval(env, type_);
+    GValue right = right_.Eval(env, type_);
+    bool eq = left.DefaultEquals(right);
     return new GBool(equal_ ? eq : !eq);
   }
 
@@ -3027,15 +2913,14 @@ class Equality : Expression {
 }
 
 class Is : Conversion {
-  public Is(Expression ^expr, TypeExpr ^type_expr) : base(expr, type_expr) { }
+  public Is(Expression expr, TypeExpr type_expr) : base(expr, type_expr) { }
 
   public override GType Check(Context ctx) {
     return CheckConversion(ctx, true) ? GBool.type_ : null;
   }
 
-  public override RValue ^Eval(Env env) {
-    RValue ^r = expr_.Eval(env);
-    GValue v = r.Get();
+  public override GValue Eval(Env env) {
+    GValue v = expr_.Eval(env);
     return new GBool(!(v is Null) && v.Type().IsSubtype(to_base_));
   }
 
@@ -3049,7 +2934,7 @@ class Is : Conversion {
 }
 
 class As : Conversion {
-  public As(Expression ^expr, TypeExpr ^type_expr) : base(expr, type_expr) { }
+  public As(Expression expr, TypeExpr type_expr) : base(expr, type_expr) { }
 
   public override Local GetLocal() { return expr_.GetLocal(); }
 
@@ -3072,9 +2957,9 @@ class As : Conversion {
     expr_.LoseOwnership();
   }
 
-  public override RValue ^Eval(Env env) {
-    RValue ^r = expr_.Eval(env);
-    return r.Get().Type().IsSubtype(to_base_) ? r : Null.Instance.Copy();
+  public override GValue Eval(Env env) {
+    GValue v = expr_.Eval(env);
+    return v.Type().IsSubtype(to_base_) ? v : Null.Instance;
   }
 
   public override string Emit() {
@@ -3088,10 +2973,10 @@ class As : Conversion {
 // a && or || operator
 class LogicalOp : Expression {
   bool and_;  // true => &&, false => ||
-  Expression ^left_, right_;
-  Joiner ^join_ = new Joiner();
+  Expression left_, right_;
+  Joiner join_ = new Joiner();
 
-  public LogicalOp(Expression ^left, int op, Expression ^right) {
+  public LogicalOp(Expression left, int op, Expression right) {
     left_ = left;
     switch (op) {
       case Parser.OP_AND: and_ = true; break;
@@ -3115,7 +3000,7 @@ class LogicalOp : Expression {
     return GBool.type_;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     bool left = left_.EvalBool(env);
     bool b = and_ ? left && right_.EvalBool(env) : left || right_.EvalBool(env);
     return new GBool(b);
@@ -3131,14 +3016,14 @@ class LogicalOp : Expression {
 
 // the ?: operator
 class Conditional : Expression {
-  Expression ^condition_;
-  Expression ^if_true_, if_false_;
+  Expression condition_;
+  Expression if_true_, if_false_;
 
   GType true_type_, false_type_;
   GType type_;
-  Joiner ^join_ = new Joiner();
+  Joiner join_ = new Joiner();
 
-  public Conditional(Expression ^condition, Expression ^if_true, Expression ^if_false) {
+  public Conditional(Expression condition, Expression if_true, Expression if_false) {
     condition_ = condition; if_true_ = if_true; if_false_ = if_false;
   }
 
@@ -3176,7 +3061,7 @@ class Conditional : Expression {
     if_false_.LoseOwnership();
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     return condition_.EvalBool(env) ? if_true_.Eval(env, type_) : if_false_.Eval(env, type_);
   }
 
@@ -3187,12 +3072,12 @@ class Conditional : Expression {
 }
 
 class Assign : Expression {
-  LValue ^left_;
-  Expression ^right_;
+  LValue left_;
+  Expression right_;
 
   GType left_type_, right_type_;
 
-  public Assign(LValue ^left, Expression ^right) {
+  public Assign(LValue left, Expression right) {
     left_ = left; right_ = right;
   }
 
@@ -3231,13 +3116,12 @@ class Assign : Expression {
     return left_.GetPropertyOrIndexer() != null ? TypeSet.empty_ : left_.StorageType().VarDestroys();
   }
 
-  public override RValue ^Eval(Env env) {
-    RValue ^v1, v2;
+  public override GValue Eval(Env env) {
+    GValue v1, v2;
     left_.Eval1(env, out v1, out v2);
-    RValue ^val = right_.Eval(env, left_type_);
-    RValue ^ret = val.CopyRef();
+    GValue val = right_.Eval(env, left_type_);
     left_.EvalSet(env, v1, v2, val);
-    return ret;
+    return val;
   }
 
   public override string Emit() {
@@ -3247,13 +3131,13 @@ class Assign : Expression {
 
 // a compound assignment operator such as += or -=
 class CompoundAssign : Expression {
-  LValue ^left_;
+  LValue left_;
   int op_;
-  Expression ^right_;
+  Expression right_;
 
   GType type_;
 
-  public CompoundAssign(LValue ^left, int op, Expression ^right) {
+  public CompoundAssign(LValue left, int op, Expression right) {
     left_ = left; op_ = op; right_ = right;
   }
 
@@ -3282,28 +3166,32 @@ class CompoundAssign : Expression {
     return type_;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     Location loc = left_.EvalLocation(env);
     if (type_ == GBool.type_) {
-      bool x = ((GBool) loc.value_).b_;
+      GBool x = (GBool) loc.value_;
       bool y = right_.EvalBool(env);
-      loc.value_ = Binary.BoolOp(x, op_, y);
-      return loc.value_.CopyRef();
+      GBool z = Binary.BoolOp(x.b_, op_, y);
+      loc.value_ = z;
+      return z;
     } else if (type_ == GInt.type_) {
       GInt x = (GInt) loc.value_;
       int y = right_.EvalInt(env);
-      loc.value_ = Binary.IntOp(x.i_, op_, y);
-      return loc.value_.CopyRef();
+      GInt z = (GInt) Binary.IntOp(x.i_, op_, y);
+      loc.value_ = z;
+      return z;
     } else if (type_ == GFloat.type_) {
       GFloat x = (GFloat) loc.value_;
       float y = right_.EvalFloat(env);
-      loc.value_ = Binary.FloatOp(x.f_, op_, y);
-      return loc.value_.CopyRef();
+      GFloat z = (GFloat) Binary.FloatOp(x.f_, op_, y);
+      loc.value_ = z;
+      return z;
     } else if (type_ == GDouble.type_) {
       GDouble x = (GDouble) loc.value_;
       double y = right_.EvalDouble(env);
-      loc.value_ = Binary.DoubleOp(x.d_, op_, y);
-      return loc.value_.CopyRef();
+      GDouble z = (GDouble) Binary.DoubleOp(x.d_, op_, y);
+      loc.value_ = z;
+      return z;
     } else {
       Debug.Assert(false);
       return null;
@@ -3316,10 +3204,10 @@ class CompoundAssign : Expression {
 }
 
 class Take : Expression {
-  LValue ^exp_;
+  LValue exp_;
   Owning type_;
 
-  public Take(LValue ^exp) { exp_ = exp; }
+  public Take(LValue exp) { exp_ = exp; }
 
   public override GType Check(Context ctx) {
     GType t = exp_.Check(ctx);
@@ -3337,9 +3225,9 @@ class Take : Expression {
 
   public override GType TemporaryType() { return type_; }
 
-  public override RValue ^Eval(Env env) {
-    RValue ^v = exp_.Eval(env);
-    exp_.EvalSet(env, Null.Instance.Copy());
+  public override GValue Eval(Env env) {
+    GValue v = exp_.Eval(env);
+    exp_.EvalSet(env, Null.Instance);
     return v;
   }
 
@@ -3350,7 +3238,7 @@ class Take : Expression {
 
 abstract class Statement : Node {
   public abstract bool Check(Context ctx);
-  public abstract RValue ^Eval(Env env);
+  public abstract GValue Eval(Env env);
 
   public abstract void Emit(SourceWriter w);
 
@@ -3369,9 +3257,9 @@ abstract class Statement : Node {
 }
 
 class StatementList {
-  public readonly ArrayList /* of Statement */ ^statements_ = new ArrayList();
+  public readonly ArrayList /* of Statement */ statements_ = new ArrayList();
 
-  public void Add(Statement ^s) { statements_.Add(s); }
+  public void Add(Statement s) { statements_.Add(s); }
 
   public bool Check(Context ctx) {
     bool ok = true;
@@ -3380,9 +3268,9 @@ class StatementList {
     return ok;
   }
 
-  public RValue ^Eval(Env env) {
+  public GValue Eval(Env env) {
     foreach (Statement s in statements_) {
-      RValue ^v = s.Eval(env);
+      GValue v = s.Eval(env);
       if (v != null)
         return v;
     }
@@ -3401,10 +3289,10 @@ class EmptyStatement : InlineStatement {
   public EmptyStatement() { }
 
   public override bool Check(Context ctx) { return true; }
-  public override RValue ^Eval(Env env) { return null; }
+  public override GValue Eval(Env env) { return null; }
   public override void EmitInline(SourceWriter w) { }
 
-  public static readonly EmptyStatement ^instance_ = new EmptyStatement();
+  public static readonly EmptyStatement instance_ = new EmptyStatement();
 }
 
 // A Scoped is a statement defining one or more local variables.  If a Scoped appears in the
@@ -3413,8 +3301,6 @@ abstract class Scoped : Statement {
   protected Local start_;   // the first local outside this statement
   protected Local top_;     // the top local defined inside this statement
 
-  TypeSet ^destroys_;
-
   protected void SetStartVar(Context ctx) { start_ = top_ = ctx.var_; }
   protected void SetTopVar(Context ctx) { top_ = ctx.var_; }
 
@@ -3422,24 +3308,22 @@ abstract class Scoped : Statement {
   public Local GetTop() { return top_; }
 
   public override TypeSet NodeDestroys() {
-    if (destroys_ == null) {
-      destroys_ = new TypeSet();
+    TypeSet set = new TypeSet();
     for (Local l = top_; l != start_; l = l.next_)
-        destroys_.Add(l.Type().VarDestroys());
-    }
-    return destroys_;
+      set.Add(l.Type().VarDestroys());
+    return set;
   }
 }
 
 class Block : Scoped {
-  public readonly StatementList ^list_;
+  public readonly StatementList list_;
 
-  public Block(StatementList ^list) { list_ = list; }
+  public Block(StatementList list) { list_ = list; }
 
   public bool Absent() { return list_ == null; }
 
   public override bool Check(Context ctx) {
-    Context ^ctx1 = new Context(ctx);   // don't pass declarations outside block
+    Context ctx1 = new Context(ctx);   // don't pass declarations outside block
     SetStartVar(ctx1);
 
     if (!list_.Check(ctx1))
@@ -3454,11 +3338,11 @@ class Block : Scoped {
     return true;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     return list_.Eval(new Env(env));
   }
 
-  public static Block ^EmptyBlock() { return new Block(new StatementList()); }
+  public static Block EmptyBlock() { return new Block(new StatementList()); }
 
   public override void Emit(SourceWriter w) {
     w.OpenBrace();
@@ -3486,12 +3370,12 @@ class MemberKind {
 }
 
 class Named : Node {
-  public readonly TypeExpr ^type_expr_;   // may be null for certain objects such as constructors
+  public readonly TypeExpr type_expr_;   // may be null for certain objects such as constructors
   protected GType type_;
 
   public readonly string name_;
 
-  public Named(TypeExpr ^type_expr, string name) {
+  public Named(TypeExpr type_expr, string name) {
     type_expr_ = type_expr;
     name_ = name;
   }
@@ -3511,7 +3395,7 @@ abstract class Member : Named {
 
   public readonly int attributes_;
 
-  protected Member(int attributes, TypeExpr ^type_expr, string name) : base(type_expr, name) {
+  protected Member(int attributes, TypeExpr type_expr, string name) : base(type_expr, name) {
     attributes_ = attributes;
   }
 
@@ -3551,7 +3435,7 @@ abstract class Member : Named {
     return HasAttribute(Attribute.Virtual | Attribute.Abstract | Attribute.Override);
   }
 
-  static ArrayList ^empty_ = new ArrayList();
+  static ArrayList empty_ = new ArrayList();
 
   public virtual ArrayList /* of Parameter */ Parameters() { return empty_; }
 
@@ -3565,7 +3449,7 @@ abstract class Member : Named {
 
     // In GEL2 (as in C# and C++), a class [from_class] can access a protected member of
     // a class C only if [from_class] is a subtype of C and the access is
-    // through a subtype of [from_class].  See e.gel2. C# 3.5.3 "Protected Access for Instance Members".
+    // through a subtype of [from_class].  See e.g. C# 3.5.3 "Protected Access for Instance Members".
     if (IsProtected())
       return through_base || from_class.IsSubtype(class_) && through_type.IsSubtype(from_class);
 
@@ -3710,7 +3594,7 @@ abstract class Member : Named {
 
 // a member which represents a storage location: a field, property, or indexer
 abstract class LMember : Member {
-  protected LMember(int attributes, TypeExpr ^type_expr, string name)
+  protected LMember(int attributes, TypeExpr type_expr, string name)
     : base(attributes, type_expr, name) { }
 
   public bool IsConstOrStatic() {
@@ -3739,19 +3623,18 @@ abstract class LMember : Member {
 
   // These methods are for fields and properties; indexers have their own versions which take
   // an extra index argument.
-  public virtual RValue ^Get(GValue obj) { Debug.Assert(false); return null; }
-  public virtual RValue ^Take(GValue obj) { Debug.Assert(false); return null; }
-  public virtual void Set(GObject obj, RValue ^val)  { Debug.Assert(false); }
+  public virtual GValue Get(GValue obj) { Debug.Assert(false); return null; }
+  public virtual void Set(GObject obj, GValue val)  { Debug.Assert(false); }
 
   public virtual string Emit()  { Debug.Assert(false); return null; }
   public virtual string EmitSet(string val)  { Debug.Assert(false); return null; }
 }
 
 class Field : LMember {
-  protected Expression ^initializer_;    // or null if none
+  protected Expression initializer_;    // or null if none
   protected GType initializer_type_;
 
-  public Field(int attributes, TypeExpr ^type_expr, string name, Expression ^initializer)
+  public Field(int attributes, TypeExpr type_expr, string name, Expression initializer)
   : base(attributes, type_expr, name) {
     initializer_ = initializer;
   }
@@ -3761,7 +3644,7 @@ class Field : LMember {
     type_ = type;
   }
 
-  public static Field ^New(int attributes, TypeExpr ^type_expr, string name, Expression ^initializer) {
+  public static Field New(int attributes, TypeExpr type_expr, string name, Expression initializer) {
     if ((attributes & Attribute.Static) != 0)
       return new StaticField(attributes, type_expr, name, initializer);
     if ((attributes & Attribute.Const) != 0)
@@ -3821,9 +3704,8 @@ class Field : LMember {
     return true;
   }
 
-  public override RValue ^Get(GValue obj) { return obj.Get(this); }
-  public override RValue ^Take(GValue obj) { return obj.Take(this); }
-  public override void Set(GObject obj, RValue ^val) { obj.Set(this, val); }
+  public override GValue Get(GValue obj) { return obj.Get(this); }
+  public override void Set(GObject obj, GValue val) { obj.Set(this, val); }
   public override Location GetLocation(GObject obj) { return obj.GetLocation(this); }
 
   protected void WriteField(SourceWriter w, bool declaration) {
@@ -3864,15 +3746,15 @@ class Field : LMember {
 }
 
 class StaticField : Field {
-  protected Location ^loc_;
+  protected Location loc_;
 
-  public StaticField(int attributes, TypeExpr ^type_expr, string name, Expression ^initializer)
+  public StaticField(int attributes, TypeExpr type_expr, string name, Expression initializer)
     : base(attributes, type_expr, name, initializer) { }
 
   public override bool Check(Context ctx) {
     if (!base.Check(ctx))
       return false;
-    loc_ = new Location(Type().DefaultValue().Copy());
+    loc_ = new Location(Type().DefaultValue());
     return true;
   }
 
@@ -3901,9 +3783,8 @@ class StaticField : Field {
       loc_.value_ = initializer_.Eval(Env.static_, type_);
   }
 
-  public override RValue ^Get(GValue obj) { return loc_.Get().CopyRef(); }
-  public override RValue ^Take(GValue obj) { return take loc_.value_; }
-  public override void Set(GObject obj, RValue ^val) { loc_.value_ = val; }
+  public override GValue Get(GValue obj) { return loc_.value_; }
+  public override void Set(GObject obj, GValue val) { loc_.value_ = val; }
   public override Location GetLocation(GObject obj) { return loc_; }
 
   public override void Emit(SourceWriter w) {
@@ -3928,9 +3809,9 @@ class StaticField : Field {
 }
 
 class ConstField : Field {
-  protected SimpleValue ^value_;
+  protected SimpleValue value_;
 
-  public ConstField(int attributes, TypeExpr ^type_expr, string name, Expression ^initializer)
+  public ConstField(int attributes, TypeExpr type_expr, string name, Expression initializer)
     : base(attributes, type_expr, name, initializer) { }
 
   public override bool Check(Context ctx) {
@@ -3939,23 +3820,23 @@ class ConstField : Field {
     return initializer_.CheckConstant();
   }
 
-  SimpleValue ^Get() {
+  SimpleValue Get() {
     if (value_ == DefaultValue.instance_) {
       Error("circular dependency among constant fields");
-      GEL2.Exit();
+      Gel.Exit();
     }
     if (value_ == null) {
       value_ = new DefaultValue();    // marker used to catch circular const references
       value_ = (SimpleValue)initializer_.Eval(Env.static_, type_);
     }
-    return value_.Copy();
+    return value_;
   }
 
-  public override RValue ^Get(GValue obj) {
+  public override GValue Get(GValue obj) {
     return Get();
   }
 
-  public override void Set(GObject obj, RValue ^val) { Debug.Assert(false); }
+  public override void Set(GObject obj, GValue val) { Debug.Assert(false); }
   public override Location GetLocation(GObject obj) { Debug.Assert(false); return null; }
 
   public override void EmitDeclaration(SourceWriter w) {
@@ -4009,7 +3890,7 @@ class ExpressionTraverser : Traverser {
     if (start == end || !type.IsOwned() || expr is This || expr is Base)
       return false;
     Local local = expr.GetLocal();
-    ExpressionTraverser ^et = new ExpressionTraverser(start, local, type);
+    ExpressionTraverser et = new ExpressionTraverser(start, local, type);
     end.Traverse(et, Control.GetMarkerValue());
     return et.destroy_ && (local == null || et.assign_);
   }
@@ -4073,12 +3954,12 @@ class LocalTraverser : Traverser {
 }
 
 class Local : Named {
-  protected Expression ^initializer_;    // or null if none
+  protected Expression initializer_;    // or null if none
   protected GType initializer_type_;
 
   public Local next_;    // next variable upward in scope chain
 
-  NonOwningArrayList /* of Name */ ^uses_ = new NonOwningArrayList();    // all uses of this variable
+  ArrayList /* of Name */ uses_ = new ArrayList();    // all uses of this variable
 
   protected bool mutable_;   // true if this local may ever change after it's first initialized
 
@@ -4096,7 +3977,7 @@ class Local : Named {
     return type_ is Owning || type_ == GString.type_ || needs_ref_;
   }
 
-  public Local(TypeExpr ^type_expr, string name, Expression ^initializer) : base(type_expr, name) {
+  public Local(TypeExpr type_expr, string name, Expression initializer) : base(type_expr, name) {
     initializer_ = initializer;
     next_ = null;
   }
@@ -4148,7 +4029,7 @@ class Local : Named {
   // Traverse the control graph nodes where this local is live, calling the given
   // LocalHandler's Handle method on each node.
   public bool Traverse(Method method, LocalHandler h) {
-    LocalTraverser ^t = new LocalTraverser(this, h);
+    LocalTraverser t = new LocalTraverser(this, h);
     int marker = Control.GetMarkerValue();
     foreach (Name name in uses_) {
       t.SetUse(name);
@@ -4202,24 +4083,20 @@ class Local : Named {
 }
 
 class Parameter : Local {
-  public Parameter(TypeExpr ^type_expr, string name) : base(type_expr, name, null) { }
-
   // We represent some parameters using both a C++ parameter and a C++ local, which
   // have different types; we call these dual parameters.  For such parameters
   // param_name_ is the C++ parameter name.
   string param_name_;
 
-  public static Parameter ^New(int mode, TypeExpr ^type_expr, string name) {
+  public Parameter(TypeExpr type_expr, string name) : base(type_expr, name, null) { }
+
+  public static Parameter New(int mode, TypeExpr type_expr, string name) {
     return mode == 0 ? new Parameter(type_expr, name) :
                                new RefOutParameter(mode, type_expr, name);
   }
 
   public virtual int GetMode() { return 0; }
   public string TypeString() { return Mode.ToString(GetMode()) + type_.ToString(); }
-
-  public virtual Parameter ^Copy() {
-    return new Parameter(new TypeLiteral(type_), name_);
-  }
 
   public virtual bool CanReceive(Argument a) {
     return a.GetMode() == 0 && a.Type().CanConvert(type_, ConversionContext.MethodArg);
@@ -4266,12 +4143,10 @@ class RefOutParameter : Parameter {
   public readonly int mode_;
   public override int GetMode() { return mode_; }
 
-  public RefOutParameter(int mode, TypeExpr ^type_expr, string name) : base(type_expr, name) {
+  public RefOutParameter(int mode, TypeExpr type_expr, string name) : base(type_expr, name) {
     mode_ = mode;
     mutable_ = true;
   }
-
-  public override Parameter ^Copy() { Debug.Assert(false); return null; }
 
   public override bool CanReceive(Argument a) {
     if (mode_ != a.GetMode())
@@ -4306,14 +4181,14 @@ abstract class InlineStatement : Statement {
 }
 
 class VariableDeclaration : InlineStatement {
-  ArrayList /* of Local */ ^locals_ = new ArrayList();
+  ArrayList /* of Local */ locals_ = new ArrayList();
 
-  public VariableDeclaration(TypeExpr ^type_expr, string name, Expression ^initializer) {
+  public VariableDeclaration(TypeExpr type_expr, string name, Expression initializer) {
     locals_.Add(new Local(type_expr, name, initializer));
   }
 
-  public void Add(string name, Expression ^initializer) {
-    TypeExpr ^t = ((Local) locals_[0]).type_expr_.Copy();
+  public void Add(string name, Expression initializer) {
+    TypeExpr t = ((Local) locals_[0]).type_expr_;
     locals_.Add(new Local(t, name, initializer));
   }
 
@@ -4329,7 +4204,7 @@ class VariableDeclaration : InlineStatement {
   // Return the type of all variables in this VariableDeclaration.
   public GType Type() { return ((Local) locals_[0]).Type(); }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     foreach (Local l in locals_)
       l.EvalInit(env);
     return null;
@@ -4352,9 +4227,9 @@ class VariableDeclaration : InlineStatement {
 }
 
 class ExpressionStatement : InlineStatement {
-  Expression ^exp_;
+  Expression exp_;
 
-  public ExpressionStatement(Expression ^e) {
+  public ExpressionStatement(Expression e) {
     exp_ = e;
   }
 
@@ -4365,7 +4240,7 @@ class ExpressionStatement : InlineStatement {
     return true;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     exp_.Eval(env);   // discard expression value
     return null;
   }
@@ -4377,12 +4252,12 @@ class ExpressionStatement : InlineStatement {
 }
 
 class If : Statement {
-  Expression ^condition_;
-  Statement ^if_true_;
-  Statement ^if_false_;
-  Joiner ^join_ = new Joiner();
+  Expression condition_;
+  Statement if_true_;
+  Statement if_false_;
+  Joiner join_ = new Joiner();
 
-  public If(Expression ^condition, Statement ^if_true, Statement ^if_false) {
+  public If(Expression condition, Statement if_true, Statement if_false) {
     condition_ = condition; if_true_ = if_true; if_false_ = if_false;
   }
 
@@ -4406,7 +4281,7 @@ class If : Statement {
     return true;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     if (condition_.EvalBool(env))
       return if_true_.Eval(env);
     else
@@ -4426,9 +4301,8 @@ class If : Statement {
 
 class DefaultValue : SimpleValue {
   public DefaultValue() { }
-  public static readonly DefaultValue ^instance_ = new DefaultValue();
+  public static readonly DefaultValue instance_ = new DefaultValue();
 
-  public override SimpleValue ^Copy() { Debug.Assert(false); return null; }
   public override GType Type()  { Debug.Assert(false); return null; }
   public override string Emit() { Debug.Assert(false); return null; }
 }
@@ -4439,38 +4313,38 @@ class DefaultValue : SimpleValue {
 // in that section.  There doesn't seem to be much point in allowing sections to share locals
 // since GEL2 (like C#) doesn't allow control to fall through from one section to the next.  This also
 // makes compiling to C++ slightly easier since C++ doesn't allow local variables in switch sections
-// other than the last to have initializers (see e.gel2. C++ Primer, 4th ed., 6.6.5 "Variable Definitions
+// other than the last to have initializers (see e.g. C++ Primer, 4th ed., 6.6.5 "Variable Definitions
 // inside a switch").
 
 class SwitchSection : Node {
-  ArrayList /* of Expression */ ^cases_;     // null represents default:
-  public readonly Block ^block_;
+  ArrayList /* of Expression */ cases_;     // null represents default:
+  public readonly Block block_;
 
-  ArrayList /* of GValue */ ^values_ = new ArrayList();
+  ArrayList /* of GValue */ values_ = new ArrayList();
 
-  public SwitchSection(ArrayList ^cases, StatementList ^statements) {
+  public SwitchSection(ArrayList cases, StatementList statements) {
     cases_ = cases;
     block_ = new Block(statements);
   }
 
-  public bool Check(Context ctx, GType switch_type, OwningHashtable all_values, out bool is_default) {
+  public bool Check(Context ctx, GType switch_type, Hashtable all_values, out bool is_default) {
     is_default = false;
     foreach (Expression e in cases_) {
-      GValue ^v;
+      GValue v;
       if (e == null) {
         is_default = true;
         v = new DefaultValue();
       } else {
         if (!e.Check(ctx, switch_type) || !e.CheckConstant())
           return false;
-        v = (GValue) e.Eval(Env.static_, switch_type);
+        v = e.Eval(Env.static_, switch_type);
       }
       if (all_values.ContainsKey(v)) {
         Error("switch statement cannot contain the same value twice");
         return false;
       }
-      all_values.Set(v, null);
       values_.Add(v);
+      all_values[v] = null;
     }
     return block_.Check(ctx);
   }
@@ -4507,16 +4381,16 @@ class SwitchSection : Node {
 }
 
 abstract class Escapable : Scoped {
-  public readonly Joiner ^exit_ = new Joiner();
+  public readonly Joiner exit_ = new Joiner();
 }
 
 class Switch : Escapable {
-  Expression ^expr_;
+  Expression expr_;
   GType type_;
-  ArrayList /* of SwitchSection */ ^sections_;
+  ArrayList /* of SwitchSection */ sections_;
   SwitchSection default_;    // or null if no default section
 
-  public Switch(Expression ^expr, ArrayList ^sections) { expr_ = expr; sections_ = sections; }
+  public Switch(Expression expr, ArrayList sections) { expr_ = expr; sections_ = sections; }
 
   public override bool Check(Context ctx) {
     SetStartVar(ctx);
@@ -4527,8 +4401,8 @@ class Switch : Escapable {
       Error("switch expression must be of type int, char or string");
       return false;
     }
-    Context ^ctx1 = new Context(ctx, this);
-    OwningHashtable ^values = new OwningHashtable();
+    Context ctx1 = new Context(ctx, this);
+    Hashtable values = new Hashtable();
     Control c = ctx1.Prev();
     foreach (SwitchSection s in sections_) {
       bool is_default;
@@ -4555,15 +4429,15 @@ class Switch : Escapable {
     return default_;
   }
 
-  RValue ^CatchBreak(RValue ^v) {
+  GValue CatchBreak(GValue v) {
     return v is BreakValue ? null : v;
   }
 
-  public override RValue ^Eval(Env env) {
-    RValue ^v = expr_.Eval(env);
+  public override GValue Eval(Env env) {
+    GValue v = expr_.Eval(env);
     if (v == null)
       return null;
-    SwitchSection s = FindSection(v.Get());
+    SwitchSection s = FindSection(v);
     if (s == null)
       return null;
     return CatchBreak(s.block_.Eval(env));
@@ -4601,14 +4475,14 @@ class Switch : Escapable {
 }
 
 abstract class Loop : Escapable {
-  public readonly Joiner ^loop_ = new Joiner();
+  public readonly Joiner loop_ = new Joiner();
 }
 
 abstract class ForOrWhile : Loop {
-  protected Expression ^condition_;
-  protected Statement ^statement_;
+  protected Expression condition_;
+  protected Statement statement_;
 
-  protected ForOrWhile(Expression ^condition, Statement ^statement) {
+  protected ForOrWhile(Expression condition, Statement statement) {
     condition_ = condition; statement_ = statement;
   }
 
@@ -4616,7 +4490,7 @@ abstract class ForOrWhile : Loop {
   protected abstract InlineStatement Iterator();
 
   public override bool Check(Context prev_ctx) {
-    Context ^ctx = new Context(prev_ctx, this);   // initializer may declare new local variable
+    Context ctx = new Context(prev_ctx, this);   // initializer may declare new local variable
     SetStartVar(ctx);
     if (!Initializer().Check(ctx))
       return false;
@@ -4646,10 +4520,10 @@ abstract class ForOrWhile : Loop {
     return true;
   }
 
-  public override RValue ^Eval(Env outer_env) {
-    Env ^env = new Env(outer_env);   // initializer may declare new local
+  public override GValue Eval(Env env) {
+    env = new Env(env);   // initializer may declare new local
     for (Initializer().Eval(env); condition_.EvalBool(env); Iterator().Eval(env)) {
-      RValue ^v = statement_.Eval(env);
+      GValue v = statement_.Eval(env);
       if (v is BreakValue)
         break;
       if (v is ContinueValue)
@@ -4662,7 +4536,7 @@ abstract class ForOrWhile : Loop {
 }
 
 class While : ForOrWhile {
-  public While(Expression ^condition, Statement ^statement) : base(condition, statement) { }
+  public While(Expression condition, Statement statement) : base(condition, statement) { }
 
   protected override InlineStatement Initializer()  { return EmptyStatement.instance_; }
   protected override InlineStatement Iterator()  { return EmptyStatement.instance_; }
@@ -4674,11 +4548,11 @@ class While : ForOrWhile {
 }
 
 class For : ForOrWhile {
-  InlineStatement ^initializer_;
-  InlineStatement ^iterator_;
+  InlineStatement initializer_;
+  InlineStatement iterator_;
 
-  public For(InlineStatement ^initializer, Expression ^condition, InlineStatement ^iterator,
-             Statement ^statement)
+  public For(InlineStatement initializer, Expression condition, InlineStatement iterator,
+             Statement statement)
     : base(condition != null ? condition : new Literal(new GBool(true)),
            statement) {
     initializer_ = initializer != null ? initializer : new EmptyStatement();
@@ -4699,12 +4573,12 @@ class For : ForOrWhile {
 }
 
 class Do : Loop {
-  Statement ^statement_;
-  Expression ^condition_;
+  Statement statement_;
+  Expression condition_;
 
-  Joiner ^join_ = new Joiner();
+  Joiner join_ = new Joiner();
 
-  public Do(Statement ^statement, Expression ^condition) {
+  public Do(Statement statement, Expression condition) {
     statement_ = statement;
     condition_ = condition;
   }
@@ -4712,7 +4586,7 @@ class Do : Loop {
   public override bool Check(Context ctx) {
     join_.AddControl(ctx);
 
-    Context ^ctx1 = new Context(ctx, this);
+    Context ctx1 = new Context(ctx, this);
     SetStartVar(ctx);
 
     if (!statement_.Check(ctx1))
@@ -4733,9 +4607,9 @@ class Do : Loop {
     return true;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     do {
-      RValue ^v = statement_.Eval(env);
+      GValue v = statement_.Eval(env);
       if (v is BreakValue)
         break;
       if (v is ContinueValue)
@@ -4765,17 +4639,17 @@ class Definer : Node {
 }
 
 class ForEach : Loop {
-  Local ^local_;
-  Expression ^expr_;
+  Local local_;
+  Expression expr_;
   GType expr_type_;
-  Statement ^statement_;
+  Statement statement_;
 
   Property count_;
   Indexer indexer_;
 
-  Definer ^definer_;
+  Definer definer_;
 
-  public ForEach(TypeExpr ^type_expr, string name, Expression ^expr, Statement ^statement) {
+  public ForEach(TypeExpr type_expr, string name, Expression expr, Statement statement) {
     local_ = new Local(type_expr, name, null);
     expr_ = expr;
     statement_ = statement;
@@ -4799,7 +4673,7 @@ class ForEach : Loop {
       return false;
     }
 
-    ArrayList ^args = new ArrayList();
+    ArrayList args = new ArrayList();
     args.Add(new InArgument(GInt.type_));
     indexer_ = (Indexer) expr_type_.Lookup(this, ctx.class_, false, MemberKind.Indexer, null, args, false);
     if (indexer_ == null) {
@@ -4817,7 +4691,7 @@ class ForEach : Loop {
       return false;
     }
 
-    Context ^ctx1 = new Context(ctx, this);
+    Context ctx1 = new Context(ctx, this);
 
     SetStartVar(ctx1);
     if (!local_.Check(ctx1))   // will add local to scope chain
@@ -4845,22 +4719,21 @@ class ForEach : Loop {
     return true;
   }
 
-  public override RValue ^Eval(Env outer_env) {
-    RValue ^r = expr_.Eval(outer_env);
-    GValue e = r.Get();
+  public override GValue Eval(Env env) {
+    GValue e = expr_.Eval(env);
     if (e is Null) {
       Error("foreach: can't iterate over null object");
-      GEL2.Exit();
+      Gel.Exit();
     }
 
     int count = ((GInt) count_.Get(e)).i_;
 
-    Env ^env = new Env(outer_env);
+    env = new Env(env);
     env.Add(local_, null);
     for (int i = 0 ; i < count ; ++i) {
-      RValue ^v = indexer_.Get(e, new GInt(i));
-      env.Set(local_, v.Get().ConvertExplicit(ref v, local_.Type()));
-      RValue ^s = statement_.Eval(env);
+      GValue v = indexer_.Get(e, new GInt(i));
+      env.Set(local_, v.ConvertExplicit(local_.Type()));
+      GValue s = statement_.Eval(env);
       if (s is BreakValue)
         break;
       if (s is ContinueValue)
@@ -4890,7 +4763,7 @@ class ForEach : Loop {
 class BreakValue : GValue {
   public BreakValue() { }
 
-  public static readonly BreakValue ^instance_ = new BreakValue();
+  public static readonly BreakValue instance_ = new BreakValue();
 
   public override GType Type()  { Debug.Assert(false); return null; }
 }
@@ -4921,7 +4794,7 @@ class Break : BreakOrContinue {
     return true;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     return new BreakValue();
   }
 
@@ -4933,7 +4806,7 @@ class Break : BreakOrContinue {
 class ContinueValue : GValue {
   public ContinueValue() { }
 
-  public static readonly ContinueValue ^instance_ = new ContinueValue();
+  public static readonly ContinueValue instance_ = new ContinueValue();
 
   public override GType Type()  { Debug.Assert(false); return null; }
 }
@@ -4949,7 +4822,7 @@ class Continue : BreakOrContinue {
     return true;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     return new ContinueValue();
   }
 
@@ -4959,11 +4832,11 @@ class Continue : BreakOrContinue {
 }
 
 class Return : Statement {
-  Expression ^exp_;    // null if no return value
+  Expression exp_;    // null if no return value
   GType exp_type_;
   GType type_;
 
-  public Return(Expression ^exp) {
+  public Return(Expression exp) {
     exp_ = exp;
   }
 
@@ -4991,9 +4864,9 @@ class Return : Statement {
     return true;
   }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     return exp_ != null ? exp_.Eval(env, type_)
-                        : Null.Instance.Copy();    // an arbitrary value
+                        : Null.Instance;    // an arbitrary value
   }
 
   public override void Emit(SourceWriter w) {
@@ -5060,34 +4933,32 @@ class MethodTraverser : Traverser {
 }
 
 class Method : Member {
-  public readonly ArrayList /* of Parameter */ ^parameters_;
+  public readonly ArrayList /* of Parameter */ parameters_;
 
-  protected Block ^body_;
+  protected Block body_;
 
-  public Joiner ^exit_ = new Joiner();
+  public Joiner exit_ = new Joiner();
 
   // all parameters and locals defined in this method
-  readonly NonOwningArrayList /* of Local */ ^locals_ = new NonOwningArrayList();
+  readonly ArrayList /* of Local */ locals_ = new ArrayList();
 
-  NonOwningArrayList /* of Method */ ^overrides_;   // list of all overrides (virtual methods only)
+  ArrayList /* of Method */ overrides_;   // list of all overrides (virtual methods only)
 
   // methods called from this method
-  public readonly NonOwningArrayList /* of Method */ ^calls_ = new NonOwningArrayList();
+  public readonly ArrayList /* of Method */ calls_ = new ArrayList();
 
   // Types destroyed inside this method, not including types destroyed through
   // calls to other methods.
-  public readonly TypeSet ^internal_destroys_ = new TypeSet();
+  public readonly TypeSet internal_destroys_ = new TypeSet();
 
   // Types destroyed inside this method or in any methods called by this method.
-  TypeSet ^destroys_;
-
-  TypeSet ^parameter_destroys_;
+  TypeSet destroys_;
 
   // A marker used when performing a depth-first search of the method graph to compute destroys_.
   int method_marker_;
 
-  public Method(int attributes, TypeExpr ^return_type_expr,
-                string name, ArrayList /* of Parameter */ ^parameters, Block ^body)
+  public Method(int attributes, TypeExpr return_type_expr,
+                string name, ArrayList /* of Parameter */ parameters, Block body)
     : base(attributes, return_type_expr, name) {
     parameters_ = parameters;
     body_ = body;
@@ -5163,7 +5034,7 @@ class Method : Member {
       return false;
     }
 
-    Context ^ctx = new Context(prev_ctx, this);
+    Context ctx = new Context(prev_ctx, this);
 
     prev_ = unreachable_;
     ctx.SetPrev(this);    // begin the control graph with this Method
@@ -5187,7 +5058,7 @@ class Method : Member {
     ctx.ClearPrev();  // control graph is complete
 
     // Traverse the control graph to build calls_ and internal_destroys_.
-    MethodTraverser ^mt = new MethodTraverser(this);
+    MethodTraverser mt = new MethodTraverser(this);
     exit_.Traverse(mt, Control.GetMarkerValue());
 
     bool ok = true;
@@ -5215,17 +5086,15 @@ class Method : Member {
   }
 
   public override TypeSet NodeDestroys() {
-    if (parameter_destroys_ == null) {
-      parameter_destroys_ = new TypeSet();
+    TypeSet set = new TypeSet();
     foreach (Parameter p in parameters_)
-        parameter_destroys_.Add(p.Type().VarDestroys());
-    }
-    return parameter_destroys_;
+      set.Add(p.Type().VarDestroys());
+    return set;
   }
 
   protected override void AddOverride(Member m) {
     if (overrides_ == null)
-      overrides_ = new NonOwningArrayList();
+      overrides_ = new ArrayList();
     overrides_.Add((Method) m);
   }
 
@@ -5259,22 +5128,22 @@ class Method : Member {
   }
 
   // overridden by Constructor subclass
-  public virtual RValue ^Eval(Env env) {
+  public virtual GValue Eval(Env env) {
     return body_.Eval(env);
   }
 
-  public RValue ^Invoke(GValue obj, ArrayList /* of ValueOrLocation */ values) {
+  public GValue Invoke(GValue obj, ArrayList /* of ValueOrLocation */ values) {
     if (body_.Absent()) { // an external method
-      ValueList ^list = new ValueList(values);
+      ValueList list = new ValueList(values);
       if (IsStatic())
         return class_.InvokeStatic(this, list);   // let the class handle it
       return obj.Invoke(this, list);   // let the object handle it
     }
 
-    Env ^env = new Env(obj);
+    Env env = new Env(obj);
     Debug.Assert(values.Count == parameters_.Count);
     for (int i = 0 ; i < values.Count ; ++i)
-      env.Add((Parameter) parameters_[i], (ValueOrLocation) values.Take(i));
+      env.Add((Parameter) parameters_[i], (ValueOrLocation) values[i]);
 
     return Eval(env);
   }
@@ -5361,27 +5230,27 @@ class Method : Member {
       w.CloseBrace();
       w.WriteLine("");
     }
-    if (GEL2.print_type_sets_)
+    if (Gel.print_type_sets_)
       Console.WriteLine("{0}.{1}: {2}", class_.name_, name_, Destroys());
   }
 }
 
 class Constructor : Method {
   bool call_base_;
-  ArrayList /* of Argument */ ^initializer_params_;
+  ArrayList /* of Argument */ initializer_params_;
 
   Constructor initializer_;
 
   bool invoked_;  // true if another constructor invokes this one using : base() or : this()
 
-  public Constructor(int attributes, string name, ArrayList ^parameters,
-                     bool call_base, ArrayList ^initializer_params, Block ^body)
+  public Constructor(int attributes, string name, ArrayList parameters,
+                     bool call_base, ArrayList initializer_params, Block body)
     : base(attributes, null, name, parameters, body) {
     call_base_ = call_base;
     initializer_params_ = initializer_params;
   }
 
-  public Constructor(int attributes, string name, ArrayList ^parameters, Block ^body)
+  public Constructor(int attributes, string name, ArrayList parameters, Block body)
     : this(attributes, name, parameters, true, new ArrayList(), body) { }
 
   public override int Kind() { return MemberKind.Constructor; }
@@ -5418,7 +5287,7 @@ class Constructor : Method {
   // this node gets added when we call Invocation.CheckInvoke() above.
   public override Method Calls() { return initializer_; }
 
-  public override RValue ^Eval(Env env) {
+  public override GValue Eval(Env env) {
     if (initializer_ == null || initializer_.class_ != class_) {
       // run instance variable initializers
       foreach (Field f in class_.fields_)
@@ -5505,12 +5374,12 @@ abstract class PropertyOrIndexer : LMember {
   // null.  We need to distinguish these cases since for abstract or extern properties the
   // presence of a get accessor with an empty body indicates that a property is readable.
   // (set_block_ works similarly.)
-  Block ^get_block_, set_block_;
+  Block get_block_, set_block_;
 
   protected Method getter_, setter_;
 
-  protected PropertyOrIndexer(int attributes, TypeExpr ^type_expr, string name,
-                              string id1, Block ^block1, string id2, Block ^block2)
+  protected PropertyOrIndexer(int attributes, TypeExpr type_expr, string name,
+                              string id1, Block block1, string id2, Block block2)
     : base(attributes, type_expr, name) {
     StoreAccessor(id1, block1);
     if (id2 != null)
@@ -5519,7 +5388,7 @@ abstract class PropertyOrIndexer : LMember {
       Error("can't have two {0} accessors", id1);
   }
 
-  void StoreAccessor(string id, Block ^block) {
+  void StoreAccessor(string id, Block block) {
     // Note that we don't have scanner tokens GET and SET since these are not keywords in GEL2.
     switch (id) {
       case "get": get_block_ = block; return;
@@ -5533,32 +5402,25 @@ abstract class PropertyOrIndexer : LMember {
 
   protected abstract string BaseName();
 
-  ArrayList ^CopyParameters() {
-    ArrayList ^a = new ArrayList();
-    foreach (Parameter p in Parameters())
-      a.Add(p.Copy());
-    return a;
-  }
-
   public override bool Check(Context ctx) {
     if (!base.Check(ctx))
       return false;
 
     if (get_block_ != null) {
-      Method ^m = new Method(attributes_, new TypeLiteral(type_), "get_" + BaseName(), CopyParameters(), take get_block_);
-      getter_ = m;
-      class_.Add(m);
+      getter_ = new Method(attributes_, new TypeLiteral(type_), "get_" + BaseName(), Parameters(), get_block_);
+      class_.Add(getter_);
       if (!getter_.Resolve(ctx.program_) || !getter_.Check(ctx))
         return false;
     }
 
     if (set_block_ != null) {
-      ArrayList ^set_params = CopyParameters();
+      ArrayList set_params = new ArrayList();
+      foreach (Parameter p in Parameters())
+        set_params.Add(p);
       set_params.Add(new Parameter(new TypeLiteral(type_), "value"));
-      Method ^m = new Method(attributes_ | Attribute.Setter,
-                           new TypeLiteral(Void.type_), "set_" + BaseName(), set_params, take set_block_);
-      setter_ = m;
-      class_.Add(m);
+      setter_ = new Method(attributes_ | Attribute.Setter,
+                           new TypeLiteral(Void.type_), "set_" + BaseName(), set_params, set_block_);
+      class_.Add(setter_);
       if (!setter_.Resolve(ctx.program_) || !setter_.Check(ctx))
         return false;
     }
@@ -5567,11 +5429,11 @@ abstract class PropertyOrIndexer : LMember {
   }
 
   public override bool CheckAssigning(Syntax caller, Context ctx, bool assigning) {
-    if (assigning && set_block_ == null && setter_ == null) {
+    if (assigning && set_block_ == null) {
       caller.Error("can't assign to read-only {0}", KindString());
       return false;
     }
-    if (!assigning && get_block_ == null && getter_ == null) {
+    if (!assigning && get_block_ == null) {
       caller.Error("can't read from write-only {0}", KindString());
       return false;
     }
@@ -5582,8 +5444,8 @@ abstract class PropertyOrIndexer : LMember {
 }
 
 class Property : PropertyOrIndexer {
-  public Property(int attributes, TypeExpr ^type_expr, string name,
-                  string id1, Block ^block1, string id2, Block ^block2)
+  public Property(int attributes, TypeExpr type_expr, string name,
+                  string id1, Block block1, string id2, Block block2)
     : base(attributes, type_expr, name, id1, block1, id2, block2) { }
 
   public override int Kind() { return MemberKind.Property; }
@@ -5594,12 +5456,12 @@ class Property : PropertyOrIndexer {
 
   protected override string BaseName() { return name_; }
 
-  public override RValue ^Get(GValue obj) {
+  public override GValue Get(GValue obj) {
     return Invocation.InvokeMethod(obj, getter_, new ArrayList(), true);
   }
 
-  public override void Set(GObject obj, RValue ^val) {
-    ArrayList ^a = new ArrayList();
+  public override void Set(GObject obj, GValue val) {
+    ArrayList a = new ArrayList();
     a.Add(val);
     Invocation.InvokeMethod(obj, setter_, a, true);
   }
@@ -5616,10 +5478,10 @@ class Property : PropertyOrIndexer {
 class Indexer : PropertyOrIndexer {
   public readonly Parameter parameter_;
 
-  ArrayList /* of Parameter */ ^parameters_;
+  ArrayList /* of Parameter */ parameters_;
 
-  public Indexer(int attributes, TypeExpr ^type_expr, Parameter ^parameter,
-                 string id1, Block ^block1, string id2, Block ^block2)
+  public Indexer(int attributes, TypeExpr type_expr, Parameter parameter,
+                 string id1, Block block1, string id2, Block block2)
     : base(attributes, type_expr, null, id1, block1, id2, block2) {
     parameter_ = parameter;
 
@@ -5653,22 +5515,22 @@ class Indexer : PropertyOrIndexer {
     return parameters_; 
   }
 
-  public RValue ^Get(GValue obj, RValue ^index) {
-    ArrayList ^a = new ArrayList();
+  public GValue Get(GValue obj, GValue index) {
+    ArrayList a = new ArrayList();
     a.Add(index);
     return Invocation.InvokeMethod(obj, getter_, a, true);
   }
 
-  public void Set(GObject obj, RValue ^index, RValue ^val) {
-    ArrayList ^a = new ArrayList();
+  public void Set(GObject obj, GValue index, GValue val) {
+    ArrayList a = new ArrayList();
     a.Add(index);
     a.Add(val);
     Invocation.InvokeMethod(obj, setter_, a, true);
   }
 }
 
-class Class : Ownable {
-  Syntax ^syntax_ = new Syntax();
+class Class : GType {
+  Syntax syntax_ = new Syntax();
   Program program_;   // containing program
   int attributes_;
   public readonly string name_;
@@ -5676,17 +5538,15 @@ class Class : Ownable {
 
   Class parent_;
 
-  public readonly NonOwningArrayList /* of Field */ ^fields_ = new NonOwningArrayList();
-  public readonly NonOwningArrayList /* of Method */ ^methods_ = new NonOwningArrayList();
-  public readonly NonOwningArrayList /* of Property */ ^properties_ = new NonOwningArrayList();
-  public readonly NonOwningArrayList /* of Indexer */ ^indexers_ = new NonOwningArrayList();
-  public readonly NonOwningArrayList /* of Constructor */ ^constructors_ = new NonOwningArrayList();
+  public readonly ArrayList /* of Field */ fields_ = new ArrayList();
+  public readonly ArrayList /* of Method */ methods_ = new ArrayList();
+  public readonly ArrayList /* of Property */ properties_ = new ArrayList();
+  public readonly ArrayList /* of Indexer */ indexers_ = new ArrayList();
+  public readonly ArrayList /* of Constructor */ constructors_ = new ArrayList();
 
-  public readonly ArrayList /* of Member */ ^members_ = new ArrayList();
+  public readonly ArrayList /* of Member */ members_ = new ArrayList();
 
-  public readonly ArrayList /* of Temporaries */ ^temporaries_ = new ArrayList();
-
-  public readonly NonOwningArrayList /* of Class */ ^subclasses_ = new NonOwningArrayList();
+  public readonly ArrayList /* of Class */ subclasses_ = new ArrayList();
   bool emitted_;
 
   // If virtual_ is true, then this class needs a vtable; we set this for a class C
@@ -5711,7 +5571,7 @@ class Class : Ownable {
   bool need_destroy_;  // true if we need to emit _Destroy methods for this class
 
   // The set of types which may be destroyed when an instance of this class is destroyed.
-  TypeSet ^destroys_;
+  TypeSet destroys_;
 
   // A marker used in performing a depth-first search to construct the destroys_ type set.
   int marker_;
@@ -5720,11 +5580,8 @@ class Class : Ownable {
 
   public static Class New(int attributes, string name, string parent_name) {
     Class c = Internal.Find(name);
-    if (c == null) {
-      Class ^c1 = new Class(name);
-      c = c1;
-      GEL2.program_.AddOwn(c1);
-    }
+    if (c == null)
+      c = new Class(name);
 
     c.attributes_ = attributes;
     c.parent_name_ = parent_name;
@@ -5755,21 +5612,21 @@ class Class : Ownable {
     return ((attributes_ & a) != 0);
   }
 
-  public virtual GValue ^New() { return new GObject(this); }
-  public virtual RValue ^InvokeStatic(Method m, ValueList args) { Debug.Assert(false); return null; }
+  public virtual GValue New() { return new GObject(this); }
+  public virtual GValue InvokeStatic(Method m, ValueList args) { Debug.Assert(false); return null; }
 
-  public void Add(Field ^f) { f.SetClass(this); fields_.Add(f); members_.Add(f);  }
+  public void Add(Field f) { f.SetClass(this); fields_.Add(f); members_.Add(f);  }
 
-  public virtual void Add(Method ^m) { m.SetClass(this); methods_.Add(m); members_.Add(m);  }
+  public virtual void Add(Method m) { m.SetClass(this); methods_.Add(m); members_.Add(m);  }
 
-  public void Add(Property ^p) { p.SetClass(this); properties_.Add(p); members_.Add(p);  }
+  public void Add(Property p) { p.SetClass(this); properties_.Add(p); members_.Add(p);  }
 
-  public void Add(Indexer ^i) { i.SetClass(this); indexers_.Add(i); members_.Add(i); }
+  public void Add(Indexer i) { i.SetClass(this); indexers_.Add(i); members_.Add(i); }
 
-  public void AddConstructor(Constructor ^c) { c.SetClass(this); constructors_.Add(c); members_.Add(c);  }
+  public void AddConstructor(Constructor c) { c.SetClass(this); constructors_.Add(c); members_.Add(c);  }
 
-  public NonOwningArrayList /* of Member */ ^FindAbstractMembers() {
-    NonOwningArrayList /* of Member */ ^a;
+  public ArrayList /* of Member */ FindAbstractMembers() {
+    ArrayList /* of Member */ a;
     if (parent_ != null)  {
       a = parent_.FindAbstractMembers();
 
@@ -5783,7 +5640,7 @@ class Class : Ownable {
           a.RemoveAt(i);
         } else ++i;
       }
-    } else a = new NonOwningArrayList();
+    } else a = new ArrayList();
 
     // add abstract members from this class
     foreach (Member m in members_) {
@@ -5832,7 +5689,7 @@ class Class : Ownable {
       return false;
     }
 
-    Context ^ctx = new Context(prev_ctx, this);
+    Context ctx = new Context(prev_ctx, this);
     bool ok = true;
     foreach (Field f in fields_) {
       ConstField cf = f as ConstField;
@@ -5843,7 +5700,7 @@ class Class : Ownable {
   }
 
   public bool Check(Context prev_ctx) {
-    Context ^ctx = new Context(prev_ctx, this);
+    Context ctx = new Context(prev_ctx, this);
 
     bool ok = true;
 
@@ -5859,7 +5716,7 @@ class Class : Ownable {
       ok &= i.Check(ctx);
 
     if (!HasAttribute(Attribute.Abstract)) {
-      NonOwningArrayList ^a = FindAbstractMembers();
+      ArrayList a = FindAbstractMembers();
       if (a.Count > 0) {
         foreach (Member m in a)
           syntax_.Error("class does not define inherited abstract {0} {1}", m.KindString(), m.name_);
@@ -5870,7 +5727,7 @@ class Class : Ownable {
     return ok;
   }
 
-  public void GetMainMethod(NonOwningArrayList /* of Method */ result) {
+  public void GetMainMethod(ArrayList /* of Method */ result) {
     foreach (Method m in methods_)
       if (m.name_ == "Main" && m.IsPublic() && m.IsStatic() && m.ReturnType() == Void.type_) {
         int c = m.parameters_.Count;
@@ -5907,13 +5764,6 @@ class Class : Ownable {
       FindTypeDestroys(Control.GetMarkerValue(), destroys_);
     }
     return destroys_;
-  }
-
-  public Temporaries NewTemporaries() {
-    Temporaries ^t = new Temporaries();
-    Temporaries ret = t;
-    temporaries_.Add(t);
-    return ret;
   }
 
   public void StaticInit() {
@@ -6020,7 +5870,7 @@ class Class : Ownable {
 
     if (need_destroy_) {
       access = EmitAccess(w, access, Attribute.Public);
-      w.IWriteLine("GEL2_OBJECT({0})", name_);
+      w.IWriteLine("GEL_OBJECT({0})", name_);
       w.WriteLine("");
     }
 
@@ -6058,30 +5908,26 @@ class Class : Ownable {
     foreach (Method m in methods_)
       m.Emit(w);
 
-    if (GEL2.print_type_sets_)
+    if (Gel.print_type_sets_)
       Console.WriteLine("~{0}: {1}", name_, TypeDestroys());
   }
 }
 
-class ClassPtr {
-  public readonly Class class_;
-
-  public ClassPtr(Class c) { class_ = c; }
-}
-
 class ValueList {
   public ArrayList list_;
+  int index_ = 0;
+
   public ValueList(ArrayList list) { list_ = list; }
 
-  public GValue Object(int i) { return ((RValue) list_[i]).Get(); }
-  public bool Bool(int i) { return ((GBool) list_[i]).b_; }
-  public int Int(int i) { return ((GInt) list_[i]).i_; }
-  public char Char(int i) { return ((GChar) list_[i]).c_; }
-  public string GetString(int i) { return ((GString) list_[i]).s_; }
+  public GValue Object() { return (GValue) list_[index_++]; }
+  public bool Bool() { return ((GBool) list_[index_++]).b_; }
+  public int Int() { return ((GInt) list_[index_++]).i_; }
+  public char Char() { return ((GChar) list_[index_++]).c_; }
+  public string GetString() { return ((GString) list_[index_++]).s_; }
 }
 
 class Internal : Class {
-  static NonOwningArrayList /* of Internal */ ^all_ = new NonOwningArrayList();
+  static ArrayList /* of Internal */ all_ = new ArrayList();
 
   protected Internal(string name) : base(name) { }
 
@@ -6122,7 +5968,7 @@ class ObjectClass : Internal {
 
   public ObjectClass() : base("Object") { }
 
-  public override void Add(Method ^m) {
+  public override void Add(Method m) {
     switch (m.name_) {
       case "Equals": equals_ = m; break;
       case "GetHashCode": get_hash_code_ = m; break;
@@ -6154,7 +6000,7 @@ abstract class IntegralType : SimpleType {
 class BoolClass : IntegralType {
   public BoolClass() : base("Bool") { }
 
-  static GBool ^default_ = new GBool(false);
+  static GBool default_ = new GBool(false);
   public override SimpleValue DefaultValue() { return default_; }
 
   public override string ToString() { return "bool"; }
@@ -6165,7 +6011,7 @@ class BoolClass : IntegralType {
 class CharClass : IntegralType {
   public CharClass() : base("Char") { }
 
-  static GChar ^default_ = new GChar('\0');
+  static GChar default_ = new GChar('\0');
 
   public override SimpleValue DefaultValue() { return default_; }
 
@@ -6173,11 +6019,11 @@ class CharClass : IntegralType {
 
   public override string ToString() { return "char"; }
 
-  public override RValue ^InvokeStatic(Method m, ValueList args) {
+  public override GValue InvokeStatic(Method m, ValueList args) {
     switch (m.name_) {
-      case "IsDigit": return new GBool(Char.IsDigit(args.Char(0)));
-      case "IsLetter": return new GBool(Char.IsLetter(args.Char(0)));
-      case "IsWhiteSpace": return new GBool(Char.IsWhiteSpace(args.Char(0)));
+      case "IsDigit": return new GBool(Char.IsDigit(args.Char()));
+      case "IsLetter": return new GBool(Char.IsLetter(args.Char()));
+      case "IsWhiteSpace": return new GBool(Char.IsWhiteSpace(args.Char()));
       default: Debug.Assert(false); return null;
     }
   }
@@ -6188,7 +6034,7 @@ class CharClass : IntegralType {
 class IntClass : IntegralType {
   public IntClass() : base("Int") { }
 
-  static GInt ^default_ = new GInt(0);
+  static GInt default_ = new GInt(0);
 
   public override SimpleValue DefaultValue() { return default_; }
 
@@ -6202,9 +6048,9 @@ class IntClass : IntegralType {
 
   public override string ToString() { return "int"; }
 
-  public override RValue ^InvokeStatic(Method m, ValueList args) {
+  public override GValue InvokeStatic(Method m, ValueList args) {
     switch (m.name_) {
-      case "Parse": return new GInt(int.Parse(args.GetString(0)));
+      case "Parse": return new GInt(int.Parse(args.GetString()));
       default: Debug.Assert(false); return null;
     }
   }
@@ -6215,7 +6061,7 @@ class IntClass : IntegralType {
 class FloatClass : SimpleType {
   public FloatClass() : base("Single") { }
 
-  static GFloat ^default_ = new GFloat(0.0f);
+  static GFloat default_ = new GFloat(0.0f);
 
   public override SimpleValue DefaultValue() { return default_; }
 
@@ -6235,7 +6081,7 @@ class FloatClass : SimpleType {
 class DoubleClass : SimpleType {
   public DoubleClass() : base("Double") { }
 
-  static GDouble ^default_ = new GDouble(0.0d);
+  static GDouble default_ = new GDouble(0.0d);
 
   public override SimpleValue DefaultValue() { return default_; }
 
@@ -6268,9 +6114,9 @@ class StringClass : Internal {
     return EmitType();
   }
 
-  public override RValue ^InvokeStatic(Method m, ValueList args) {
+  public override GValue InvokeStatic(Method m, ValueList args) {
     switch (m.name_) {
-      case "Format": return new GString(String.Format(args.GetString(0), args.Object(1)));
+      case "Format": return new GString(String.Format(args.GetString(), args.Object()));
       default: Debug.Assert(false); return null;
     }
   }
@@ -6278,21 +6124,21 @@ class StringClass : Internal {
 
 class StringBuilderClass : Internal {
   public StringBuilderClass() : base("StringBuilder") { }
-  public override GValue ^New() { return new GStringBuilder(); }
+  public override GValue New() { return new GStringBuilder(); }
 }
 
 class GStringBuilder : GValue {
-  readonly StringBuilder ^b_ = new StringBuilder();
+  readonly StringBuilder b_ = new StringBuilder();
 
-  public static readonly StringBuilderClass ^type_ = new StringBuilderClass();
+  public static readonly StringBuilderClass type_ = new StringBuilderClass();
 
   public override GType Type() { return type_; }
 
-  public override RValue ^Invoke(Method m, ValueList args) {
+  public override GValue Invoke(Method m, ValueList args) {
     if (m.GetClass() != type_)
       return base.Invoke(m, args);
     switch (m.name_) {
-      case "Append": b_.Append(args.Char(0)); return null;
+      case "Append": b_.Append(args.Char()); return null;
       case "ToString": return new GString(b_.ToString());
       default: Debug.Assert(false); return null;
     }
@@ -6302,16 +6148,16 @@ class GStringBuilder : GValue {
 class PoolClass : Internal {
   public PoolClass() : base("Pool") { }
 
-  public static PoolClass ^instance_ = new PoolClass();
+  public static PoolClass instance_ = new PoolClass();
 }
 
 class DebugClass : Internal {
   public DebugClass() : base("Debug") { }
-  public static readonly DebugClass ^instance_ = new DebugClass();
+  public static readonly DebugClass instance_ = new DebugClass();
   
-  public override RValue ^InvokeStatic(Method m, ValueList args) {
+  public override GValue InvokeStatic(Method m, ValueList args) {
     switch (m.name_) {
-      case "Assert": Debug.Assert(args.Bool(0)); return null;
+      case "Assert": Debug.Assert(args.Bool()); return null;
       default: Debug.Assert(false); return null;
     }
   }
@@ -6319,11 +6165,11 @@ class DebugClass : Internal {
 
 class EnvironmentClass : Internal {
   public EnvironmentClass() : base("Environment") { }
-  public static readonly EnvironmentClass ^instance_ = new EnvironmentClass();
+  public static readonly EnvironmentClass instance_ = new EnvironmentClass();
 
-  public override RValue ^InvokeStatic(Method m, ValueList args) {
+  public override GValue InvokeStatic(Method m, ValueList args) {
     switch (m.name_) {
-      case "Exit": Environment.Exit(args.Int(0)); return null;
+      case "Exit": Environment.Exit(args.Int()); return null;
       default: Debug.Assert(false); return null;
     }
   }
@@ -6334,73 +6180,73 @@ class EnvironmentClass : Internal {
 class ConsoleClass : Internal {
   public ConsoleClass() : base("Console") { }
 
-  public override RValue ^InvokeStatic(Method m, ValueList args) {
+  public override GValue InvokeStatic(Method m, ValueList args) {
     switch (m.name_) {
       case "Write":
         switch (m.parameters_.Count) {
-          case 1: Console.Write(args.Object(0)); return null;
-          case 2: Console.Write(args.GetString(0), args.Object(1)); return null;
-          case 3: Console.Write(args.GetString(0), args.Object(1), args.Object(2)); return null;
+          case 1: Console.Write(args.Object()); return null;
+          case 2: Console.Write(args.GetString(), args.Object()); return null;
+          case 3: Console.Write(args.GetString(), args.Object(), args.Object()); return null;
           default: Debug.Assert(false); return null;
         }
       case "WriteLine":
         switch (m.parameters_.Count) {
-          case 1: Console.WriteLine(args.Object(0)); return null;
-          case 2: Console.WriteLine(args.GetString(0), args.Object(1)); return null;
-          case 3: Console.WriteLine(args.GetString(0), args.Object(1), args.Object(2)); return null;
+          case 1: Console.WriteLine(args.Object()); return null;
+          case 2: Console.WriteLine(args.GetString(), args.Object()); return null;
+          case 3: Console.WriteLine(args.GetString(), args.Object(), args.Object()); return null;
           default: Debug.Assert(false); return null;
         }
       default: Debug.Assert(false); return null;
     }
   }
 
-  public static readonly ConsoleClass ^instance_ = new ConsoleClass();
+  public static readonly ConsoleClass instance_ = new ConsoleClass();
 }
 
 class FileClass : Internal {
   public FileClass() : base("File") { }
 
-  public override RValue ^InvokeStatic(Method m, ValueList args) {
+  public override GValue InvokeStatic(Method m, ValueList args) {
     switch (m.name_) {
-      case "Delete": File.Delete(args.GetString(0)); return null;
+      case "Delete": File.Delete(args.GetString()); return null;
       case "Exists": return new GBool(File.Exists(args.ToString()));
       default: Debug.Assert(false); return null;
     }
   }
 
-  public static readonly FileClass ^instance_ = new FileClass();
+  public static readonly FileClass instance_ = new FileClass();
 }
 
 class PathClass : Internal {
   public PathClass() : base("Path") { }
 
-  public override RValue ^InvokeStatic(Method m, ValueList args) {
+  public override GValue InvokeStatic(Method m, ValueList args) {
     switch (m.name_) {
       case "GetTempFileName": return new GString(Path.GetTempFileName());
       default: Debug.Assert(false); return null;
     }
   }
 
-  public static readonly PathClass ^instance_ = new PathClass();
+  public static readonly PathClass instance_ = new PathClass();
 }
 
 class StreamReaderClass : Internal {
   public StreamReaderClass() : base("StreamReader") { }
-  public override GValue ^New() { return new GStreamReader(); }
+  public override GValue New() { return new GStreamReader(); }
 }
 
 class GStreamReader : GValue {
-  StreamReader ^reader_;
+  StreamReader reader_;
 
-  public static readonly StreamReaderClass ^type_ = new StreamReaderClass();
+  public static readonly StreamReaderClass type_ = new StreamReaderClass();
 
   public override GType Type() { return type_; }
 
-  public override RValue ^Invoke(Method m, ValueList args) {
+  public override GValue Invoke(Method m, ValueList args) {
     if (m.GetClass() != type_)
       return base.Invoke(m, args);
     switch (m.name_) {
-      case "StreamReader": reader_ = new StreamReader(args.GetString(0)); return null;
+      case "StreamReader": reader_ = new StreamReader(args.GetString()); return null;
       case "Read": return new GInt(reader_.Read());
       case "Peek": return new GInt(reader_.Peek());
       default: Debug.Assert(false); return null;
@@ -6409,13 +6255,12 @@ class GStreamReader : GValue {
 }
 
 class Program {
-  ArrayList /* of string */ ^gel2_import_ = new ArrayList();
-  ArrayList /* of string */ ^cpp_import_ = new ArrayList();
+  ArrayList /* of string */ gel_import_ = new ArrayList();
+  ArrayList /* of string */ cpp_import_ = new ArrayList();
 
-  static Scanner ^scanner_;
+  static Scanner scanner_;
 
-  NonOwningArrayList ^classes_ = new NonOwningArrayList();
-  ArrayList ^own_classes_ = new ArrayList();
+  ArrayList classes_ = new ArrayList();
 
   public bool crt_alloc_;
   public bool debug_;
@@ -6427,7 +6272,7 @@ class Program {
     ArrayList a = null;
     string extension = Path.GetExtension(s);
     switch (extension) {
-      case ".gel2": a = gel2_import_; break;
+      case ".gel": a = gel_import_; break;
       case ".cpp": a = cpp_import_; break;
       default:
         new Syntax().Error("can't import file with extension {0}", extension);
@@ -6442,11 +6287,11 @@ class Program {
 
   public void FindAndImport(string s) {
     // First look relative to the importing file.
-    string dir = Path.GetDirectoryName(GEL2.CurrentFile());
+    string dir = Path.GetDirectoryName(Gel.CurrentFile());
     string s1 = Path.Combine(dir, s);
     if (!File.Exists(s1)) {
       // Now look relative to the GEL2 directory.
-      s1 = Path.Combine(GEL2.gel2_directory_, s);
+      s1 = Path.Combine(Gel.gel_directory_, s);
       if (!File.Exists(s1)) {
         new Syntax().Error("import not found: ", s);
         Environment.Exit(0);
@@ -6458,10 +6303,6 @@ class Program {
   public void Add(Class c) {
     c.SetProgram(this);
     classes_.Add(c);
-  }
-
-  public void AddOwn(Class ^c) {
-    own_classes_.Add(c);
   }
 
   public Class FindClass(string name) {
@@ -6480,14 +6321,14 @@ class Program {
   }
 
   string Builtin(string module) {
-    string file = String.Format("{0}.gel2", module);
-    return Path.Combine(GEL2.gel2_directory_, file);
+    string file = String.Format("{0}.gel", module);
+    return Path.Combine(Gel.gel_directory_, file);
   }
 
   public bool Parse() {
-    Parser ^parser = new Parser();
-    for (int i = 0; i < gel2_import_.Count; ++i) {
-      string file = (string) gel2_import_[i];
+    Parser parser = new Parser();
+    for (int i = 0; i < gel_import_.Count; ++i) {
+      string file = (string)gel_import_[i];
       scanner_ = new Scanner(file);
       parser.yyParse(scanner_);
       if (i == 0) {
@@ -6507,7 +6348,7 @@ class Program {
   }
 
   public bool Check() {
-    Context ^ctx = new Context(this);
+    Context ctx = new Context(this);
     bool ok = true;
 
     // Make a first checking pass where we check only constant fields.
@@ -6521,7 +6362,7 @@ class Program {
   }
 
   Method FindMain() {
-    NonOwningArrayList ^methods = new NonOwningArrayList();
+    ArrayList methods = new ArrayList();
     foreach (Class c in classes_) {
       c.GetMainMethod(methods);
     }
@@ -6540,9 +6381,9 @@ class Program {
     Method m = FindMain();
     if (m == null)
       return;
-    ArrayList ^a = new ArrayList();
+    ArrayList a = new ArrayList();
     if (m.parameters_.Count > 0) {   // Main() takes a string[] argument
-      GArray ^arr = new GArray(new ArrayType(GString.type_), args.Count);
+      GArray arr = new GArray(new ArrayType(GString.type_), args.Count);
       for (int i = 0 ; i < args.Count ; ++i)
         arr.Set(i, new GString((string) args[i]));
       a.Add(arr);
@@ -6556,7 +6397,7 @@ class Program {
     bool args = main.parameters_.Count > 0;
     w.Write("int main({0}) ", args ? "int argc, char *argv[]" : "");
     w.OpenBrace();
-    w.IWriteLine("return gel2_runmain({0}::Main{1});", main.GetClass().name_, args ? ", argc, argv" : "");
+    w.IWriteLine("return gel_runmain({0}::Main{1});", main.GetClass().name_, args ? ", argc, argv" : "");
     w.CloseBrace();
   }
 
@@ -6600,13 +6441,13 @@ class Program {
   // Emit C++ code.
   public bool Generate(string basename) {
     string cpp_file = basename + ".cpp";
-    StreamWriter ^w = new StreamWriter(cpp_file);
+    StreamWriter w = new StreamWriter(cpp_file);
     bool ok = Emit(new SourceWriter(w));
     w.Close();
     return ok;
   }
 
-  static string[] ^vsdirs = { "Microsoft Visual Studio 8",
+  static string[] vsdirs = { "Microsoft Visual Studio 8",
                             "Microsoft Visual Studio .NET 2003",
                             "Microsoft Visual Studio .NET 2002" };
 
@@ -6630,6 +6471,14 @@ class Program {
     return null;
   }
 
+  int Run(string command, string args) {
+    ProcessStartInfo i = new ProcessStartInfo(command, args);
+    i.UseShellExecute = false;
+    Process p = Process.Start(i);
+    p.WaitForExit();
+    return p.ExitCode;
+  }
+
   // Report compilation error. Print error message from a file
   void ReportCompilationError(string error_msg_file) {
       Console.WriteLine(
@@ -6639,24 +6488,30 @@ class Program {
       Console.WriteLine((new StreamReader(error_msg_file)).ReadToEnd());
   }
 
+  int RunShellCommand(string command) {
+    command = String.Format("-c \"{0}\"", command);
+    return Run("/bin/sh", command);
+  }
+
   void UnixCppCompile(string basename) {
     string command_out = Path.GetTempFileName();
     string dbg_options = debug_ ? "-g -DDEBUG" : "-O2 -DNDEBUG";
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     // -o basename, use basename as the executable name
     // -Werror, make all warnings into hard errors
     sb.AppendFormat("/usr/bin/g++ -o {0} -Werror {1} {2}.cpp",
                     basename, dbg_options, basename);
 
     // Append redirection of output
-    sb.AppendFormat(" >& {0}", command_out);
+    sb.AppendFormat(" > {0} 2>&1", command_out);
  
     string sh_cmd = sb.ToString();
 
-    if (GEL2.verbose_) 
+    if (Gel.verbose_) 
       Console.WriteLine(sh_cmd);
   
-    if (Process.System(sh_cmd) !=0) {
+    // use /bin/sh as command to ru
+    if (RunShellCommand(sh_cmd) !=0) {
       ReportCompilationError(command_out);
     }
     // delete intermediate files
@@ -6668,9 +6523,8 @@ class Program {
   // We must always redirect output since vsvars32 prints a message "Setting environment..."
   // which we don't want users to see.
   int VsRun(string vsvars, string command, string output) {
-    command = String.Format("(\"{0}\" & {1}) > \"{2}\"", 
-                            vsvars, command, output);
-    return Process.System(command);
+    command = String.Format("/c (\"{0}\" & {1}) > \"{2}\"", vsvars, command, output);
+    return Run("cmd", command);
   }
 
   void VsCppCompile(string basename) {
@@ -6690,15 +6544,15 @@ class Program {
       //  /GL - optimization: Whole Program Optimization
       "/MD /O2 /GL /D \"NDEBUG\"";
 
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     //  /WX - treat warnings as errors
     sb.AppendFormat("cl /nologo /WX {0} {1}.cpp", options, basename);
     string mode = debug_ ? "debug" : "release";
     if (!crt_alloc_)
-      sb.AppendFormat(" {0}\\{1}\\dlmalloc.obj", GEL2.gel2_directory_, mode);
+      sb.AppendFormat(" {0}\\{1}\\dlmalloc.obj", Gel.gel_directory_, mode);
     sb.Append(" user32.lib shell32.lib shlwapi.lib");
     string command = sb.ToString();
-    if (GEL2.verbose_)
+    if (Gel.verbose_)
       Console.WriteLine(command);
 
     if (VsRun(vsvars, command, command_out) != 0) {
@@ -6708,7 +6562,7 @@ class Program {
       // this allows the executable to find the C runtime DLL even when the manifest file is absent.
       string mt_command = String.Format("mt -nologo -manifest {0}.exe.manifest -outputresource:\"{0}.exe;#1\"",
                               basename);
-      if (GEL2.verbose_)
+      if (Gel.verbose_)
         Console.WriteLine(mt_command);
       if (VsRun(vsvars, mt_command, command_out) != 0)
         Console.WriteLine("warning: could not run manifest tool");
@@ -6730,24 +6584,24 @@ class Program {
 
   public void Compile(string output, bool cpp_only) {
     if (output == null)
-      output = Path.GetFileNameWithoutExtension((string) gel2_import_[0]);
+      output = Path.GetFileNameWithoutExtension((string) gel_import_[0]);
     if (Generate(output) && !cpp_only)
       CppCompile(output);
   }
 }
 
-class Scanner : yyInput {
+class Scanner : Parser.yyInput {
   public readonly string filename_;
 
   int line_;
   public int Line() { return line_; }
 
-  StreamReader ^sr_;
+  StreamReader sr_;
   int token_;
-  object ^ value_;
+  object value_;
 
   int next_token_ = -1;
-  object ^ next_value_;
+  object next_value_;
 
   public Scanner (string filename) {
     filename_ = filename;
@@ -6755,12 +6609,16 @@ class Scanner : yyInput {
     line_ = 1;
   }
 
-  public override int GetToken () {
-    return token_;
+  public int Token {
+    get {
+      return token_;
+    }
   }
 
-  public override object ^ GetValue () {
-    return take value_;
+  public object Value {
+    get {
+      return value_;
+    }
   }
 
   int Read() {
@@ -6781,7 +6639,7 @@ class Scanner : yyInput {
   }
 
   string ReadWord(char first) {
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     if (first != '\0')
       sb.Append(first);
     while (true) {
@@ -6796,7 +6654,7 @@ class Scanner : yyInput {
 
   // Read to the end of the current line.
   string ReadLine() {
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     char c;
     while (Read(out c)) {
       if (c == '\n')
@@ -6853,8 +6711,8 @@ class Scanner : yyInput {
             Read();
             int line = line_;
             string s = ReadLine();
-            if (GEL2.error_test_ && s.StartsWith(" error"))
-              GEL2.expected_error_lines_.Add(line);
+            if (Gel.error_test_ && s.StartsWith(" error"))
+              Gel.expected_error_lines_.Add(line);
             continue;
 
           case '*':  // comment delimited by /* ... */
@@ -6880,7 +6738,7 @@ class Scanner : yyInput {
   // Read a number, possibly including a decimal point and/or exponent.
   string ReadNumber(char first, bool hex, out bool real) {
     bool dot = false, exp = false;
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     sb.Append(first);
     if (first == '.')
       dot = true;
@@ -6921,7 +6779,7 @@ class Scanner : yyInput {
     return sb.ToString();
   }
 
-  int ParseNumber(char first, out object ^val) {
+  int ParseNumber(char first, out object val) {
     bool hex = false;
     if (first == '0') {
       char p = Peek();
@@ -6958,7 +6816,7 @@ class Scanner : yyInput {
     return Parser.INT_LITERAL;
   }
 
-  int ParseWord(char first, out object ^val) {
+  int ParseWord(char first, out object val) {
     string s = ReadWord(first);
 
     val = null;
@@ -7032,7 +6890,7 @@ class Scanner : yyInput {
     return true;
   }
 
-  int ParseChar(out object ^val) {
+  int ParseChar(out object val) {
     val = null;
     char c;
     if (!Read(out c))
@@ -7046,9 +6904,9 @@ class Scanner : yyInput {
     return Parser.CHAR_LITERAL;
   }
 
-  int ParseString(out object ^val) {
+  int ParseString(out object val) {
     val = null;
-    StringBuilder ^sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
     while (true) {
       char c;
       if (!Read(out c))
@@ -7063,7 +6921,7 @@ class Scanner : yyInput {
     return Parser.STRING_LITERAL;
   }
 
-  int ReadToken(out object ^val) {
+  int ReadToken(out object val) {
     val = null;
 
     int i = GetChar();
@@ -7116,10 +6974,10 @@ class Scanner : yyInput {
     return token;
   }
 
-  public override bool Advance () {
+  public bool Advance () {
     if (next_token_ != -1) {
       token_ = next_token_;
-      value_ = take next_value_;
+      value_ = next_value_;
       next_token_ = -1;
     } else {
       token_ = ReadToken(out value_);
@@ -7128,7 +6986,7 @@ class Scanner : yyInput {
 
     if (token_ == ')') {
       // We need to read one token ahead to determine whether this close parenthesis
-      // ends a type cast.  See e.gel2. the discussion in the Cast Expressions section
+      // ends a type cast.  See e.g. the discussion in the Cast Expressions section
       // of the C# specification.
       next_token_ = ReadToken(out next_value_);
       switch (next_token_) {
@@ -7151,26 +7009,20 @@ class Scanner : yyInput {
     }
     return true;
   }
-
-  public override void Fatal() {
-    new Syntax().Error("irrecoverable syntax error");
-    Environment.Exit(1);
-  }
-
 }
 
-class GEL2 {
+class Gel {
   public static bool verbose_;
 
   public static bool error_test_;
   public static bool print_type_sets_;
 
-  public static readonly ArrayList /* of int */ ^expected_error_lines_ = new ArrayList();
-  public static readonly ArrayList /* of int */ ^error_lines_ = new ArrayList();
+  public static readonly ArrayList /* of int */ expected_error_lines_ = new ArrayList();
+  public static readonly ArrayList /* of int */ error_lines_ = new ArrayList();
 
-  public static Program ^program_;
+  public static Program program_;
 
-  public static readonly string gel2_directory_ = GetLibraryPath();
+  public static readonly string gel_directory_ = GetLibraryPath();
 
   static string GetLibraryPath() {
     return Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName); 
@@ -7188,8 +7040,8 @@ class GEL2 {
 
   // Given two sorted ArrayLists a, b of ints, return an ArrayList containing all ints which appear
   // in [a] but not in [b].
-  ArrayList ^Diff(ArrayList a, ArrayList b) {
-    ArrayList ^ret = new ArrayList();
+  ArrayList Diff(ArrayList a, ArrayList b) {
+    ArrayList ret = new ArrayList();
     int bi = 0;
     foreach (int i in a) {
       while (bi < b.Count && (int) b[bi] < i)
@@ -7211,12 +7063,12 @@ class GEL2 {
 
   void ErrorTestReport() {
     Console.WriteLine("");
-    ArrayList ^e = Diff(error_lines_, expected_error_lines_);
+    ArrayList e = Diff(error_lines_, expected_error_lines_);
     if (e.Count > 0) {
       Console.Write("unexpected error at line ");
       WriteLineNumbers(e);
     }
-    ArrayList ^e2 = Diff(expected_error_lines_, error_lines_);
+    ArrayList e2 = Diff(expected_error_lines_, error_lines_);
     if (e2.Count > 0) {
       Console.Write("expected error at line ");
       WriteLineNumbers(e2);
@@ -7226,8 +7078,8 @@ class GEL2 {
   }
 
   void Usage() {
-    Console.WriteLine("usage: gel2 <source-file> ... [args]");
-    Console.WriteLine("       gel2 -c [-d] [-o <name>] [-u] [-v] [-cpp] <source-file> ...");
+    Console.WriteLine("usage: gel <source-file> ... [args]");
+    Console.WriteLine("       gel -c [-d] [-o <name>] [-u] [-v] [-cpp] <source-file> ...");
     Console.WriteLine("");
     Console.WriteLine("   -c: compile to native executable");
     Console.WriteLine("   -d: debug mode: disable optimizations, link with debug build of C runtime");
@@ -7272,8 +7124,8 @@ class GEL2 {
           return;
       }
 
-    for (; i < args.Length ; ++i)
-      if (args[i].EndsWith(".gel2"))
+    for (; i < args.Length; ++i)
+      if (args[i].EndsWith(".gel"))
         program_.Import(args[i]);
       else {
         if (args[i] == "-")   // marker indicating end of source files
@@ -7281,7 +7133,7 @@ class GEL2 {
         break;
       }
 
-    ArrayList ^program_args = new ArrayList();
+    ArrayList program_args = new ArrayList();
     if (compile) {
       if (i < args.Length) {
         Console.WriteLine("file to compile has unrecognized extension: {0}", args[i]);
@@ -7307,6 +7159,6 @@ class GEL2 {
   }
 
   public static void Main(string[] args) {
-    new GEL2().Run(args);
+    new Gel().Run(args);
   }
 }

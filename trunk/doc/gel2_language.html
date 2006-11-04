@@ -4,12 +4,16 @@
 
 
 
+
+  
   
   
   <link rel="stylesheet" type="text/css" href="designstyle.css">
 
 
 
+
+  
   
   
   <title>The GEL2 Programming Language</title>
@@ -19,7 +23,9 @@
 <body>
 
 
+
 <h1>The GEL2 Programming Language</h1>
+
 
 
 
@@ -28,7 +34,9 @@
 
 
 
+
 <h2>Contents in brief</h2>
+
 
 
 
@@ -36,7 +44,9 @@
 
 
 
+
 	<li><a href="#introduction">Introduction</a></li>
+
 
 
 
@@ -44,7 +54,9 @@
 
 
 
+
 	<li><a href="#overview:%20allocation">Overview: Memory Allocation</a></li>
+
 
 
 
@@ -52,7 +64,9 @@
 
 
 
+
 	<li><a href="#syntactic%20conventions">Syntactic Conventions</a></li>
+
 
 
 
@@ -60,7 +74,9 @@
 
 
 
+
 	<li><a href="#types">Types</a></li>
+
 
 
 
@@ -68,7 +84,9 @@
 
 
 
+
 	<li><a href="#expressions">Expressions</a></li>
+
 
 
 
@@ -76,7 +94,9 @@
 
 
 
+
 	<li><a href="#statements">Statements</a></li>
+
 
 
 
@@ -84,7 +104,9 @@
 
 
 
+
 	<li><a href="#programs">Programs</a></li>
+
 
 
 
@@ -92,7 +114,9 @@
 
 
 
+
 	<li><a href="#library%20classes">Library Classes</a></li>
+
 
 
 
@@ -100,7 +124,9 @@
 
 
 
+
 <h2><a name="introduction"></a>Introduction</h2>
+
 
 
 
@@ -108,6 +134,7 @@
 GEL2 is essentially a subset of C#, extended with an ownership-based type system 
 which allows GEL2 to free memory safely and deterministically without using a 
 garbage collector.</p>
+
 
 
 
@@ -120,8 +147,10 @@ straightforward to extend GEL2 to include such features.</p>
 
 
 
+
 <p>This document contains an overview and reference for the GEL2 language as 
 implemented today.&nbsp; </p>
+
 
 
 
@@ -135,7 +164,9 @@ role.</p>
 
 
 
+
 <h2><a name="overview: ownership"></a>Overview: Ownership</h2>
+
 
 
 
@@ -147,6 +178,7 @@ At run time, GEL2 keeps a count of non-owning pointers to each object.&nbsp; If 
 destroyed object's non-owning pointer count is non-zero, then a run-time error 
 occurs and program execution terminates; it is the programmer's responsibility 
 to avoid this condition.</p>
+
 
 
 
@@ -162,15 +194,18 @@ cheaper than traditional reference counts for a number of reasons as described
 
 
 
+
 <p>A pointer's compile-time type indicates whether the pointer owns the object 
 it points to.&nbsp; At run time in a compiled GEL2 program, both owning and 
 non-owning pointers are represented as ordinary (typically 32-bit) pointers.</p>
 
 
 
+
 <p>Ownership of an object may <i>transfer</i> from one pointer to another as a 
 program runs.&nbsp; GEL2's type system ensures that the single-owner property holds 
 even as ownership of an object changes.</p>
+
 
 
 
@@ -183,8 +218,10 @@ program; otherwise GEL2 frees the memory used to store o and continues execution
 
 
 
+
 <p>A simple example will illustrate how ownership works in data structures in GEL2.&nbsp; 
 Consider a doubly linked list:</p>
+
 
 
 
@@ -192,10 +229,12 @@ Consider a doubly linked list:</p>
 
 
 
+
 <p>In the image above, solid arrows indicate owning pointers and dotted arrows 
 indicate non-owning pointers.&nbsp; <code>p</code> is a local variable pointing 
 to the head of the list.&nbsp; &Oslash; represents a <code>null</code> 
 pointer indicating the end of the list.</p>
+
 
 
 
@@ -212,6 +251,7 @@ a</code>.</p>
 
 
 
+
 <p>As this example illustrates, GEL2 can automatically destroy data structures in 
 which parent nodes have owning pointers to children and child nodes have 
 non-owning pointers to parents.&nbsp; The destruction process works similarly 
@@ -220,7 +260,9 @@ reference-counted system would be unable to free these structures.</p>
 
 
 
+
 <h3>Ownership types</h3>
+
 
 
 
@@ -231,11 +273,14 @@ object fields may all have owning or non-owning types.</p>
 
 
 
+
 <p>Here's a minimal GEL2 program:</p>
 
 
 
+
 <pre>class Foo {<br>  public static void Main() {<br>    Foo ^f = new Foo();<br>  }<br>}</pre>
+
 
 
 
@@ -246,8 +291,10 @@ out of scope, GEL2 destroys the object automatically.</p>
 
 
 
+
 <p>If an owning pointer is updated with a new value, any previously pointed-to 
 object is destroyed immediately.&nbsp; For example:</p>
+
 
 
 
@@ -255,11 +302,14 @@ object is destroyed immediately.&nbsp; For example:</p>
 
 
 
+
 <p>Ownership may <dfn>transfer</dfn> between variables.&nbsp; For example:</p>
 
 
 
-<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^gel2 = f;	        // ownership transfers to GEL2<br>}</pre>
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^g = f;	        // ownership transfers to g<br>}</pre>
+
 
 
 
@@ -268,7 +318,9 @@ which may have lost ownership:</p>
 
 
 
-<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^gel2 = f;	        // ownership transfers to GEL2<br>  Foo h = f;            // error: f has lost ownership<br>}</pre>
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^g = f;	        // ownership transfers to g<br>  Foo h = f;            // error: f has lost ownership<br>}</pre>
+
 
 
 
@@ -277,11 +329,14 @@ value.&nbsp; For example:</p>
 
 
 
-<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^gel2 = f;	        // ownership transfers to GEL2<br>  f = new Foo();<br>}</pre>
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^g = f;	        // ownership transfers to g<br>  f = new Foo();<br>}</pre>
+
 
 
 
 <h3>Fields, methods and ownership</h3>
+
 
 
 
@@ -291,13 +346,16 @@ hold an integer in each node:</p>
 
 
 
+
 <pre>class Node {<br>  int i_;<br>  public Node ^next_;<br>  public Node prev_;<br>}</pre>
+
 
 
 
 <p>(Note that the trailing underscore in the field names above is not part of 
 GEL2's syntax; these fields follow Google's convention that field names end in 
 underscores.)</p>
+
 
 
 
@@ -309,11 +367,14 @@ method.&nbsp; To illustrate, let's add a constructor to the <code>Node</code> cl
 
 
 
+
 <pre>class Node {<br>  int i_;<br>  public Node ^next_;<br>  public Node prev_;</pre>
 
 
 
+
 <pre>  public Node(int i, Node ^n, Node p) { i_ = i; next_ = n; prev_ = p; }<br>}</pre>
+
 
 
 
@@ -322,7 +383,9 @@ containing the integers 1 through <code>k</code>:</p>
 
 
 
+
 <pre>static Node ^IntList(int k) {<br>  Node ^n = null;<br>  for (int i = 1 ; i &lt;= k ; ++i) {<br>    Node o = n;  // keep a pointer to previous head of list<br>    n = new Node(i, n, null);<br>    if (o != null)<br>      o.prev_ = n;  // create backlink<br>  }<br>  return n;<br>}</pre>
+
 
 
 
@@ -334,11 +397,14 @@ returns, <code>n</code> receives ownership of the newly allocated object.</p>
 
 
 
+
 <p>If we attempt to replace that line with</p>
 
 
 
+
 <pre>    n = new Node(i, o, null);</pre>
+
 
 
 
@@ -347,11 +413,14 @@ an owning value:</p>
 
 
 
-<pre>test.gel2(16): error: Node: the best overloaded constructor match has some invalid arguments<br>test.gel2(16): error: argument 2: can't convert from Node to Node ^</pre>
+
+<pre>test.gel(16): error: Node: the best overloaded constructor match has some invalid arguments<br>test.gel(16): error: argument 2: can't convert from Node to Node ^</pre>
+
 
 
 
 <h3><a name="take"></a>The take operator</h3>
+
 
 
 
@@ -360,7 +429,9 @@ following <code>this</code> off the list and returns an owning pointer to them:<
 
 
 
+
 <pre>Node ^Chop() {<br>  if (next_ != null)<br>    next_.prev_ = null;<br>  return take next_;<br>}</pre>
+
 
 
 
@@ -370,9 +441,11 @@ which is necessary since the object being taken may have only a single owner.</p
 
 
 
+
 <p>If an expression reads an owning field without using <code>take</code>, then 
 it receives a non-owning pointer.&nbsp; If we modify the <code>return</code> 
 statement above to be just</p>
+
 
 
 
@@ -380,11 +453,14 @@ statement above to be just</p>
 
 
 
+
 <p>then we receive a compile-time error:</p>
 
 
 
-<pre>test1.gel2(13): error: can't convert Node to Node ^</pre>
+
+<pre>test1.gel(13): error: can't convert Node to Node ^</pre>
+
 
 
 
@@ -396,8 +472,10 @@ so that this side effect is explicit.</p>
 
 
 
+
 <p>If <code>take</code> is applied to a pointer whose value is <code>null</code>, 
 then <code>take</code> returns <code>null</code> without error.</p>
+
 
 
 
@@ -409,11 +487,14 @@ is used with a local variable, the variable's value is set to <code>null</code>:
 
 
 
-<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^gel2 = f;        // ownership transfers to gel2; f is now undefined<br>  Foo ^h = take gel2;   // ownership transfers to h; gel2 is now null<br>}</pre>
+
+<pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Foo ^g = f;        // ownership transfers to g; f is now undefined<br>  Foo ^h = take g;   // ownership transfers to h; g is now null<br>}</pre>
+
 
 
 
 <h3>Circular data structures</h3>
+
 
 
 
@@ -423,7 +504,9 @@ other:</p>
 
 
 
+
 <pre>class Bar {<br>  Bar ^next_;<br><br>  static void MakeACycle() {<br>    Bar ^n = new Bar();<br>    Bar ^o = new Bar();<br>    Bar p = o;<br>    n.next_ = o;<br>    p.next_ = n;<br>  }<br>}</pre>
+
 
 
 
@@ -431,6 +514,7 @@ other:</p>
 containing no owning pointer cycles; this is a weaker guarantee than that provided by 
 a garbage collector, which can destroy structures containing arbitrary pointer 
 cycles.</p>
+
 
 
 
@@ -445,6 +529,7 @@ because ownership has already transferred away from it (in the assignment to
 
 
 
+
 <p>All common data structures can be coded without using owning pointer cycles.&nbsp; 
 For inherently circular structures such as a circular linked list, the GEL2 
 programmer must store all list nodes in a non-circular owning pointer list, and 
@@ -456,7 +541,9 @@ data structures encoutered in typical programs. </p>
 
 
 
+
 <h3>Object destruction order</h3>
+
 
 
 
@@ -470,7 +557,9 @@ Consider the following class:</p>
 
 
 
+
 <pre>class Bar {<br>  public Bar next_;  // automatically initialized to null<br><br>  public static void Foo() {<br>    Bar ^b = new Bar();<br>    Bar ^c = new Bar();<br>    c.next_ = b;<br>  }<br>}</pre>
+
 
 
 
@@ -479,7 +568,9 @@ rewrite <code>Foo</code> as follows:</p>
 
 
 
+
 <pre>public static void Foo() {<br>  Bar ^c = new Bar();<br>  Bar ^b = new Bar();<br>  c.next_ = b;<br>}</pre>
+
 
 
 
@@ -490,9 +581,11 @@ points to it).</p>
 
 
 
+
 <p>Practically speaking, we've found that in most GEL2 programs objects are naturally 
 destroyed without error; only occasionally have we had to rearrange variables or 
 fields to ensure that destruction works properly.</p>
+
 
 
 
@@ -505,6 +598,7 @@ to null out those pointers before the structure is destroyed.</p>
 
 
 
+
 <p>As an exception to the above, after a GEL2 program's <code>Main()</code> method finishes 
 executing GEL2 destroys all remaining objects en masse: they may contain arbitrary 
 non-owning pointers.&nbsp; This means that a GEL2 programmer doesn't need to worry 
@@ -512,7 +606,9 @@ about the order in which global variables are destroyed.</p>
 
 
 
+
 <h3>Type casts</h3>
+
 
 
 
@@ -523,12 +619,15 @@ if the value it affects is owning.&nbsp; Thus:</p>
 
 
 
+
 <pre>void Fun() {<br>  Foo ^f = new Foo();<br>  Bar ^b = (Bar) f;  // f loses ownership to b here<br>}</pre>
+
 
 
 
 <p>The <code>is</code> and <code>as</code> operators in GEL2 are similarly always 
 written with non-owning types, even though they may operate on owning or non-owning values.</p>
+
 
 
 
@@ -538,7 +637,9 @@ converts between owning and non-owning types in certain situations; see the
 
 
 
+
 <h3>Autoboxing and ownership</h3>
+
 
 
 
@@ -549,7 +650,9 @@ example:</p>
 
 
 
+
 <pre>void Fun() {<br>  object ^o = 7;     // ok<br>  object p = false;  // compile-time error: can't convert from bool to object<br>}</pre>
+
 
 
 
@@ -560,7 +663,9 @@ type:</p>
 
 
 
+
 <pre>void Fun() {<br>  object ^o = 7;<br>  int i = (int) o;<br>}</pre>
+
 
 
 
@@ -568,9 +673,11 @@ type:</p>
 
 
 
+
 <p>Strings in GEL2 are not owned; the type <code>string ^</code> does not exist.&nbsp; 
 In a compiled GEL2 program, strings are internally reference counted; a string is 
 freed when its reference count reaches zero.</p>
+
 
 
 
@@ -582,8 +689,10 @@ never be involved in a pointer cycle.</p>
 
 
 
+
 <p>A <code>string</code> may be converted either to an <code>object ^</code>&nbsp; 
 or to an <code>object</code>:</p>
+
 
 
 
@@ -591,7 +700,9 @@ or to an <code>object</code>:</p>
 
 
 
+
 <h3>this and ownership</h3>
+
 
 
 
@@ -599,7 +710,9 @@ or to an <code>object</code>:</p>
 
 
 
+
 <pre>class Foo {<br>  static Foo ^f;<br>  ...<br>  void Fun() {<br>    f = this;   // compile-time error: can't convert from Foo to Foo ^<br>  }<br>}</pre>
+
 
 
 
@@ -607,7 +720,9 @@ or to an <code>object</code>:</p>
 
 
 
+
 <p>In GEL2 an array may hold either owning or non-owning pointers:</p>
+
 
 
 
@@ -615,11 +730,14 @@ or to an <code>object</code>:</p>
 
 
 
+
 <p>The <code>take</code> operator may operate on array elements:</p>
 
 
 
+
 <pre>void Fun() {<br>  Foo ^[] ^a = new Foo^[5];<br>  a[0] = new Foo();<br>  Foo ^f = take a[0];<br>}</pre>
+
 
 
 
@@ -629,7 +747,9 @@ as a parameter.</p>
 
 
 
+
 <h3><a name="cost of reference counting"></a>The cost of reference counting</h3>
+
 
 
 
@@ -638,7 +758,9 @@ traditional reference-counted system, for three reasons:</p>
 
 
 
+
 <ol>
+
 
 
 
@@ -646,6 +768,7 @@ traditional reference-counted system, for three reasons:</p>
 	object's reference count doesn't change as it is passed from owner to owner.&nbsp; 
 	In a traditional reference-counting system, a reference count is kept for 
 	every single pointer to an object.</li>
+
 
 
 
@@ -657,6 +780,7 @@ traditional reference-counted system, for three reasons:</p>
 
 
 
+
 	<li>We use ownership information to optimize away many reference counts at 
 	compile time in GEL2.&nbsp; In particular, if a block of code manipulates only 
 	non-owning pointers to an object, then it cannot possibly free that object; 
@@ -664,11 +788,14 @@ traditional reference-counted system, for three reasons:</p>
 
 
 
+
 </ol>
 
 
 
+
 <h2><a name="overview: allocation"></a>Overview: Memory Allocation</h2>
+
 
 
 
@@ -677,7 +804,9 @@ heap, from pools, on the stack, or embedded inside another object.</p>
 
 
 
+
 <h3>Pool allocation</h3>
+
 
 
 
@@ -685,6 +814,7 @@ heap, from pools, on the stack, or embedded inside another object.</p>
 type.&nbsp; Allocation from a pool is faster than allocating from the heap, but 
 pool-allocated objects cannot be destroyed individually: all objects in a pool 
 are destroyed en masse when the pool itself is destroyed.</p>
+
 
 
 
@@ -699,8 +829,10 @@ heap-allocate and destroy the same number of objects.</p>
 
 
 
+
 <p>Pools in GEL2 have type <code>pool</code>.&nbsp; A pool can be allocated using
 <code>new</code>:</p>
+
 
 
 
@@ -708,11 +840,14 @@ heap-allocate and destroy the same number of objects.</p>
 
 
 
+
 <p>Objects can be allocated from a pool using the <code>new</code> operator:</p>
 
 
 
+
 <pre>Foo f = p.new Foo(3, 4);</pre>
+
 
 
 
@@ -723,7 +858,9 @@ manipulate those objects without using any ownership annotations whatsoever.</p>
 
 
 
+
 <h2><a name="running gel2"></a>Running GEL2</h2>
+
 
 
 
@@ -733,12 +870,15 @@ Windows XP.&nbsp; It should be straightforward to port GEL2 to other platforms.<
 
 
 
-<p>The interpreter/compiler consists of a single executable named&nbsp;<code>gel2</code> (on Linux) or <code>gel2.exe</code> 
+
+<p>The interpreter/compiler consists of a single executable named&nbsp;<code>gel</code> (on Linux) or <code>gel.exe</code> 
 (on Windows):</p>
 
 
 
-<pre>% gel2<br>usage: gel2 &lt;source-file&gt; ... [args]<br>       gel2 -c [-d] [-o &lt;name&gt;] [-u] [-v] [-cpp] &lt;source-file&gt; ...<br><br>-c: compile to native executable<br>-d: debug mode: disable optimizations, link with debug build of C runtime<br>-o: specify output filename<br>-u: unsafe: skip reference count checks<br>-v: verbose: display command used to invoke C++ compiler<br>-cpp: compile to C++ only<br>%</pre>
+
+<pre>% gel<br>usage: gel &lt;source-file&gt; ... [args]<br>       gel -c [-d] [-o &lt;name&gt;] [-u] [-v] [-cpp] &lt;source-file&gt; ...<br><br>-c: compile to native executable<br>-d: debug mode: disable optimizations, link with debug build of C runtime<br>-o: specify output filename<br>-u: unsafe: skip reference count checks<br>-v: verbose: display command used to invoke C++ compiler<br>-cpp: compile to C++ only<br>%</pre>
+
 
 
 
@@ -747,7 +887,9 @@ line:</p>
 
 
 
-<pre>% gel2 hello.gel2<br>hello world<br>%</pre>
+
+<pre>% gel hello.gel<br>hello world<br>%</pre>
+
 
 
 
@@ -755,11 +897,14 @@ line:</p>
 
 
 
+
 <p>To compile a GEL2 program to native code, use the <code>-c</code> flag:</p>
 
 
 
-<pre>% gel2 -c hello.gel2<br>% hello<br>hello world<br>%</pre>
+
+<pre>% gel -c hello.gel<br>% hello<br>hello world<br>%</pre>
+
 
 
 
@@ -770,8 +915,10 @@ and interpreter programs; we hope to fix these soon.</p>
 
 
 
+
 <p>The GEL2 compiler works by generating C++ code, which it then feeds to the C++ 
 compiler.</p>
+
 
 
 On Linux, GEL2 invokes the GCC C++ compiler, which GEL2 currently looks for only at
@@ -783,7 +930,9 @@ locations:</p>
 
 
 
+
 <pre>c:\Program Files\Microsoft Visual Studio .NET 2002<br>c:\Program Files\Microsoft Visual Studio .NET 2003<br>c:\Program Files\Microsoft Visual Studio 8</pre>
+
 
 
 
@@ -792,11 +941,14 @@ not) work with Visual Studio .NET 2002 or 2003.</p>
 
 
 
+
 <p>A GEL2 program may contain several source files:</p>
 
 
 
-<pre>% gel2 -c hello.gel2 hello2.gel2<br>% hello<br>hello world<br>%</pre>
+
+<pre>% gel -c hello.gel hello2.gel<br>% hello<br>hello world<br>%</pre>
+
 
 
 
@@ -806,12 +958,15 @@ the debug version of the C runtime library.</p>
 
 
 
+
 <p>The <code>-o</code> ("output") option specifies a base filename for the 
 output executable:</p>
 
 
 
-<pre>% gel2 -c -o zaza hello.gel2<br>% zaza<br>hello<br>%</pre>
+
+<pre>% gel -c -o zaza hello.gel<br>% zaza<br>hello<br>%</pre>
+
 
 
 
@@ -824,12 +979,15 @@ array bounds checks are currently active in GEL2 even when <code>-u</code> is sp
 
 
 
+
 <p>The <code>-v</code> ("verbose") option tells the GEL2 compiler to print the line 
 it uses to invoke the C++ compiler:</p>
 
 
 
-<pre>% gel2 -c -v test1.gel2<br>cl /nologo /MDd /Od /ZI test1.cpp user32.lib<br>%</pre>
+
+<pre>% gel -c -v test1.gel<br>cl /nologo /MDd /Od /ZI test1.cpp user32.lib<br>%</pre>
+
 
 
 
@@ -841,13 +999,16 @@ in size.</p>
 
 
 
+
 <h2><a name="syntactic conventions"></a>Syntactic Conventions</h2>
+
 
 
 
 <p>We describe the syntax of GEL2 using a grammar.&nbsp; Non-terminal symbols are 
 in <i>italics</i>.&nbsp; Characters appearing literally in a program are in a
 <code>fixed-width font</code>.</p>
+
 
 
 
@@ -858,9 +1019,11 @@ the non-terminal being defined may appear in its own productions.</p>
 
 
 
+
 <p>If a non-terminal has many short productions, we may write ": one of" after 
 the non-terminal and list all productions on a single following indented line.&nbsp; 
 For example:</p>
+
 
 
 
@@ -868,7 +1031,9 @@ For example:</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>A B C</code></p>
+
 
 
 
@@ -876,7 +1041,9 @@ For example:</p>
 
 
 
+
 <p><i>foo</i>:<br>
+
 
 
 
@@ -884,7 +1051,9 @@ For example:</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>B</code><br>
+
 
 
 
@@ -892,7 +1061,9 @@ For example:</p>
 
 
 
+
 <p>When X is a non-terminal or terminal symbol,</p>
+
 
 
 
@@ -900,7 +1071,9 @@ For example:</p>
 
 
 
+
 	<li>X<sub>opt </sub>means zero or one occurrences of X.</li>
+
 
 
 
@@ -908,7 +1081,9 @@ For example:</p>
 
 
 
+
 	<li>X<b><sup>+</sup></b> means one or more occurrences of X.</li>
+
 
 
 
@@ -917,8 +1092,10 @@ For example:</p>
 
 
 
+
 	<li>X<b><sup>+</sup></b><sub>list</sub> means one or more occurrences of X, 
 	separated by comma characters.</li>
+
 
 
 
@@ -926,7 +1103,9 @@ For example:</p>
 
 
 
+
 <h2><a name="lexical structure"></a>Lexical Structure</h2>
+
 
 
 
@@ -934,7 +1113,9 @@ For example:</p>
 
 
 
+
 <h3>Comments</h3>
+
 
 
 
@@ -946,7 +1127,9 @@ contain multiple lines.&nbsp; Block comments do not nest.</p>
 
 
 
+
 <h3>Identifiers</h3>
+
 
 
 
@@ -954,7 +1137,9 @@ contain multiple lines.&nbsp; Block comments do not nest.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; an ASCII character in the range A-Z or a-z</p>
+
 
 
 
@@ -962,7 +1147,9 @@ contain multiple lines.&nbsp; Block comments do not nest.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>0 1 2 3 4 5 6 7 8 9</code></p>
+
 
 
 
@@ -970,7 +1157,9 @@ contain multiple lines.&nbsp; Block comments do not nest.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; _</i></p>
+
 
 
 
@@ -978,11 +1167,14 @@ contain multiple lines.&nbsp; Block comments do not nest.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>letter</i><br>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>underscore</i></p>
+
 
 
 
@@ -990,7 +1182,9 @@ contain multiple lines.&nbsp; Block comments do not nest.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>letter</i><br>
+
 
 
 
@@ -998,7 +1192,9 @@ contain multiple lines.&nbsp; Block comments do not nest.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>underscore</i></p>
+
 
 
 
@@ -1006,7 +1202,9 @@ contain multiple lines.&nbsp; Block comments do not nest.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>id-initial-char</i> <i>id-char</i><sup>*</sup></p>
+
 
 
 
@@ -1015,11 +1213,14 @@ begin with a digit.</p>
 
 
 
+
 <h3>Keywords</h3>
 
 
 
+
 <p>The following <dfn>keywords</dfn> are reserved in GEL2 and may not be used as identifiers:</p>
+
 
 
 
@@ -1028,8 +1229,10 @@ else extern false<br>
 
 
 
+
 for foreach if in int is new null object out override pool private protected public 
 readonly<br>
+
 
 
 
@@ -1037,7 +1240,9 @@ ref return short static string switch take this true using virtual void while</c
 
 
 
+
 <h3>Literals</h3>
+
 
 
 
@@ -1045,7 +1250,9 @@ ref return short static string switch take this true using virtual void while</c
 
 
 
+
 <p><i>boolean-literal</i>:<br>
+
 
 
 
@@ -1053,7 +1260,9 @@ ref return short static string switch take this true using virtual void while</c
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>false</code></p>
+
 
 
 
@@ -1061,7 +1270,9 @@ ref return short static string switch take this true using virtual void while</c
 
 
 
+
 <p><i>digit</i>: one of<br>
+
 
 
 
@@ -1069,7 +1280,9 @@ ref return short static string switch take this true using virtual void while</c
 
 
 
+
 <p><i>hex-digit</i>: one of<br>
+
 
 
 
@@ -1077,7 +1290,9 @@ ref return short static string switch take this true using virtual void while</c
 
 
 
+
 <p><i>integer-literal</i>:<br>
+
 
 
 
@@ -1085,11 +1300,14 @@ ref return short static string switch take this true using virtual void while</c
 
 
 
+
 </b></sup></i>&nbsp;&nbsp;&nbsp; <code>0x</code> <i>hex-digit<sup><b>+<br>
 
 
 
+
 </b></sup></i>&nbsp;&nbsp;&nbsp; <code>0X</code> <i>hex-digit<b><sup>+</sup></b></i></p>
+
 
 
 
@@ -1099,7 +1317,9 @@ error results.</p>
 
 
 
+
 <h4>Floating-point literals</h4>
+
 
 
 
@@ -1107,7 +1327,9 @@ error results.</p>
 
 
 
+
 <p><i>sign: </i>one of<br>
+
 
 
 
@@ -1115,7 +1337,9 @@ error results.</p>
 
 
 
+
 <p><i>exponent-part:<br>
+
 
 
 
@@ -1123,7 +1347,9 @@ error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>E</code> <i>sign<sub>opt</sub></i> <i>digit<sup><b>+</b></sup></i></p>
+
 
 
 
@@ -1131,12 +1357,15 @@ error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>F f D d</code></p>
+
 
 
 
 <p><i>floating-point-literal</i>: <i>digit</i><sup>*</sup> <i>decimal-suffix<sub>opt</sub></i>
 <i>exponent-part<sub>opt</sub></i> <i>floating-point-suffix<sub>opt</sub></i></p>
+
 
 
 
@@ -1149,7 +1378,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 <h4>Character literals</h4>
+
 
 
 
@@ -1157,7 +1388,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 &nbsp;&nbsp;&nbsp; any ASCII character other than <code>'</code> or <code>\</code></p>
+
 
 
 
@@ -1165,7 +1398,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>\' \" \\ \0 \n \r \t</code></p>
+
 
 
 
@@ -1173,7 +1408,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 &nbsp;&nbsp;&nbsp; ' <i>literal-char</i> '<br>
+
 
 
 
@@ -1181,7 +1418,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 <h4>String literals</h4>
+
 
 
 
@@ -1189,7 +1428,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 &nbsp;&nbsp;&nbsp; any ASCII character other than <code>"</code> or <code>\</code></p>
+
 
 
 
@@ -1197,7 +1438,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>string-char</i><br>
+
 
 
 
@@ -1205,7 +1448,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 <p><i>string-literal</i>:<br>
+
 
 
 
@@ -1213,7 +1458,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 <h4>The null literal</h4>
+
 
 
 
@@ -1221,7 +1468,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>null</code></p>
+
 
 
 
@@ -1229,7 +1478,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 <p><i>predefined-type</i>: one of<br>
+
 
 
 
@@ -1237,7 +1488,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 <p><i>concrete-type</i>:<br>
+
 
 
 
@@ -1245,7 +1498,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>id</i><br>
+
 
 
 
@@ -1253,7 +1508,9 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 <p><i>type</i>:<br>
+
 
 
 
@@ -1261,11 +1518,14 @@ If no suffix is present, a floating-point literal is of type <code>double</code>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>concrete-type</i> <code>^</code></p>
 
 
 
+
 <p><dfn>Types</dfn> in GEL2 include <dfn>concrete types</dfn> and <dfn>owning types</dfn>.</p>
+
 
 
 
@@ -1277,10 +1537,12 @@ T, if either T's parent class is U or T's parent class is derived from U.</p>
 
 
 
+
 <p>Every <dfn>value</dfn> in GEL2 has some concrete type.&nbsp; A value V of type T is an <dfn>
 instance of</dfn> type U if T is U or if T is derived from U.&nbsp; Every value is 
 an instance of the <code>object</code> class, which forms the root of the type 
 hierarchy.</p>
+
 
 
 
@@ -1296,6 +1558,7 @@ itself.&nbsp; For more information about members, see the section
 
 
 
+
 <p>Concrete types in GEL2 include <dfn>simple types</dfn> and <dfn>reference types</dfn>.&nbsp; 
 Simple types hold small immutable values.&nbsp; In a compiled GEL2 program, 
 variables with simple types contain values directly rather than holding pointers 
@@ -1306,8 +1569,10 @@ reference type.</p>
 
 
 
+
 <p>Every concrete type has a <dfn>default value</dfn>.&nbsp; The default value 
 of every reference type is <code>null</code>.</p>
+
 
 
 
@@ -1316,7 +1581,9 @@ reference types.</p>
 
 
 
+
 <h3>Simple types</h3>
+
 
 
 
@@ -1325,7 +1592,9 @@ reference types.</p>
 
 
 
+
 <h4>bool</h4>
+
 
 
 
@@ -1334,7 +1603,9 @@ reference types.</p>
 
 
 
+
 <h4>int</h4>
+
 
 
 
@@ -1343,7 +1614,9 @@ reference types.</p>
 
 
 
+
 <h4>float / double</h4>
+
 
 
 
@@ -1354,18 +1627,23 @@ following values:</p>
 
 
 
+
 <ul>
+
 
 
 
 	<li><i>s</i> x <i>m</i> x 2<i><sup>e</sup></i>, where
     
     
+    
     <ul>
 
 
 
+
 		<li><i>s</i> is a sign bit: either +1 or -1</li>
+
 
 
 
@@ -1375,16 +1653,20 @@ following values:</p>
 
 
 
+
 		<li><i>e</i>, the exponent, is an integer in the range -149 &lt;= <i>e</i> 
 		&lt;= 104 (for a <code>float</code>) or -1075 &lt;= <i>e</i> &lt;= 970 (for a
 		<code>double</code>)</li>
 
 
 
+
 	
     
     
+    
     </ul>
+
 
 
 
@@ -1392,7 +1674,9 @@ following values:</p>
 
 
 
+
 	<li>positive or negative 0</li>
+
 
 
 
@@ -1400,7 +1684,9 @@ following values:</p>
 
 
 
+
 	<li>NaN ("not a number")</li>
+
 
 
 
@@ -1408,7 +1694,9 @@ following values:</p>
 
 
 
+
 <h4>char</h4>
+
 
 
 
@@ -1417,7 +1705,9 @@ following values:</p>
 
 
 
+
 <h3>Class types</h3>
+
 
 
 
@@ -1428,7 +1718,9 @@ Classes section below.</p>
 
 
 
+
 <h3>Array types</h3>
+
 
 
 
@@ -1439,8 +1731,10 @@ superclass of Array is the <code>object</code> class.</p>
 
 
 
+
 <p>An array of type T [] holds a fixed-length array of variables of 
 type T .</p>
+
 
 
 
@@ -1449,7 +1743,9 @@ different types, there is no implicit or explict conversion between T [] and U [
 
 
 
+
 <h3>Strings</h3>
+
 
 
 
@@ -1458,9 +1754,11 @@ Strings are immutable.</p>
 
 
 
+
 <p><code>string</code> is a reference type.&nbsp; The superclass of the <code>string</code> 
 class is the <code>object</code> 
 class.</p>
+
 
 
 
@@ -1472,7 +1770,9 @@ Strings are the only type in GEL2 which are reference counted in this way.</p>
 
 
 
+
 <h3>Pools</h3>
+
 
 
 
@@ -1481,12 +1781,15 @@ individually: they are destroyed en masse when the pool itself is destroyed.</p>
 
 
 
+
 <p><code>pool</code> is a reference type.&nbsp; The superclass of the <code>pool</code> 
 class is the <code>object</code> class.</p>
 
 
 
+
 <h3>Null type</h3>
+
 
 
 
@@ -1496,7 +1799,9 @@ type, and a variable's type may never be the null type.</p>
 
 
 
+
 <h3>Owning types</h3>
+
 
 
 
@@ -1505,11 +1810,14 @@ type, and a variable's type may never be the null type.</p>
 
 
 
+
 <h2><a name="basic concepts"></a>Basic Concepts</h2>
 
 
 
+
 <h3><a name="variables and locations"></a>Variables</h3>
+
 
 
 
@@ -1519,8 +1827,10 @@ and array elements.&nbsp;</p>
 
 
 
+
 <p>Every variable has a type.&nbsp; At run time, a variable of type <code>T</code> 
 or <code>T ^</code> always holds an instance of type <code>T</code>.</p>
+
 
 
 
@@ -1534,7 +1844,9 @@ owning object fields.</p>
 
 
 
+
 <h4>Definite assignment</h4>
+
 
 
 
@@ -1547,7 +1859,9 @@ element is initialized with a default value.</p>
 
 
 
+
 <h3><a name="conversions"></a>Conversions</h3>
+
 
 
 
@@ -1556,13 +1870,16 @@ element is initialized with a default value.</p>
 
 
 
+
 <h4><a name="implicit conversions"></a>Implicit conversions</h4>
+
 
 
 
 <p>GEL2 performs implicit conversions in many contexts including assigning to any 
 variable, passing a value as a method argument and returning a value from a 
 method.&nbsp; An implicit conversion will always succeed at run time.</p>
+
 
 
 
@@ -1574,8 +1891,10 @@ occurs when GEL2 performs an assignment from a local expression (see
 
 
 
+
 <p>The following rules determine when an implicit conversion is possible between 
 types.</p>
+
 
 
 
@@ -1583,7 +1902,9 @@ types.</p>
 
 
 
+
 <p><code>char</code> is implicitly convertible to <code>int</code>.</p>
+
 
 
 
@@ -1594,8 +1915,10 @@ precisely representable in a <code>float</code>.)</p>
 
 
 
+
 <p>If a class or array type T is derived from a type U, then T is implicitly 
 convertible to U.</p>
+
 
 
 
@@ -1604,13 +1927,16 @@ owning reference types).</p>
 
 
 
+
 <p>T ^ is implicitly convertible to U ^ if T is implicitly convertible to U.</p>
+
 
 
 
 <p>In an argument conversion or local assignment context, T ^ is implicitly 
 convertible to U if T is implicitly convertible to U.&nbsp; (In other words, GEL2 
 allows a source value to keep ownership in these contexts.)</p>
+
 
 
 
@@ -1622,12 +1948,15 @@ a boxed object instance.</p>
 
 
 
+
 <p><code>string</code> is implicitly convertible to <code>object ^</code>&nbsp; 
 and to <code>object</code> .</p>
 
 
 
+
 <h4>Explicit conversions</h4>
+
 
 
 
@@ -1639,7 +1968,9 @@ explicit conversion is possible between types.</p>
 
 
 
+
 <h5>Explicit numeric conversions</h5>
+
 
 
 
@@ -1647,12 +1978,15 @@ explicit conversion is possible between types.</p>
 
 
 
+
 <p><code>float</code> is explicitly convertible to <code>int</code>.</p>
+
 
 
 
 <p><code>double</code> is explicitly convertible to <code>float</code> or <code>
 int</code>.</p>
+
 
 
 
@@ -1664,6 +1998,7 @@ otherwise the conversion yields an undefined integer value.</p>
 
 
 
+
 <p>In an explicit conversion from a <code>double</code> <i>d</i> to a <code>
 float</code>, if <i>d</i> is too large or too small to represent as a <code>
 float</code> then the conversion yields Infinity or -Infinity.&nbsp; Otherwise, 
@@ -1671,11 +2006,14 @@ the conversion yields the <code>float</code> value nearest to d.</p>
 
 
 
+
 <h5>Other explicit conversions</h5>
 
 
 
+
 <p>If T is implicitly convertible to U, then T is explicitly convertible to U.</p>
+
 
 
 
@@ -1685,7 +2023,9 @@ instance of T.</p>
 
 
 
+
 <p>T ^ is explicitly convertible to U ^ if T is explicitly convertible to U.</p>
+
 
 
 
@@ -1695,13 +2035,16 @@ This conversion will fail if the source value is not actually an instance of T.<
 
 
 
+
 <p><code>object</code> and <code>object ^</code> are explicitly convertible to
 <code>string</code>.&nbsp; This conversion will fail if the source value is not 
 actually a string.</p>
 
 
 
+
 <h3>Member access</h3>
+
 
 
 
@@ -1713,7 +2056,9 @@ member is <code>private</code>.</p>
 
 
 
+
 <h3>Applicable methods and indexers</h3>
+
 
 
 
@@ -1725,8 +2070,10 @@ type P<sub>i </sub>in an argument conversion context (see
 
 
 
+
 <p>An indexer is applicable to an argument type A if A is implicitly convertible 
 to the indexer's parameter type in an argument conversion context.</p>
+
 
 
 
@@ -1734,9 +2081,11 @@ to the indexer's parameter type in an argument conversion context.</p>
 
 
 
+
 <p>In various contexts GEL2 needs to look up a member of a type by name; this 
 process is called a <dfn>member lookup</dfn>.&nbsp; Member lookup happens at 
 compile time.</p>
+
 
 
 
@@ -1748,10 +2097,12 @@ or a compile-time error results.</p>
 
 
 
+
 <p>Formally, to perform a member lookup in a type T for a field or property with 
 name <i>id</i>, GEL2 iterates over T and its superclasses in turn, checking each 
 class for an accessible field or property named <i>id</i>; as soon as any is 
 found, the member lookup is complete.</p>
+
 
 
 
@@ -1764,7 +2115,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 <h2><a name="expressions"></a>Expressions</h2>
+
 
 
 
@@ -1772,7 +2125,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>(</code><i> expression </i><code>)</code><br>
+
 
 
 
@@ -1780,7 +2135,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>l-value</i><br>
+
 
 
 
@@ -1788,7 +2145,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>post-increment-expression</i> <br>
+
 
 
 
@@ -1796,7 +2155,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>this</code><br>
+
 
 
 
@@ -1804,7 +2165,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 <i>&nbsp;&nbsp;&nbsp; array-creation-expression</i></p>
+
 
 
 
@@ -1812,7 +2175,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>primary</i><br>
+
 
 
 
@@ -1820,7 +2185,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>pre-decrement-expression</i><br>
+
 
 
 
@@ -1828,7 +2195,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>take-expression<br>
+
 
 
 
@@ -1836,7 +2205,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 <p><i>expression</i>:<br>
+
 
 
 
@@ -1844,7 +2215,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>simple-assignment<br>
+
 
 
 
@@ -1852,7 +2225,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 </i>&nbsp;&nbsp;&nbsp; <i>conditional-expression</i><br>
+
 
 
 
@@ -1860,7 +2235,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>as-expression</i><br>
+
 
 
 
@@ -1868,7 +2245,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 <h3>Operator precedence</h3>
+
 
 
 
@@ -1876,7 +2255,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 <p><code>* / %<br>
+
 
 
 
@@ -1884,7 +2265,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &lt;&lt; &gt;&gt;<br>
+
 
 
 
@@ -1892,7 +2275,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 &amp;<br>
+
 
 
 
@@ -1900,7 +2285,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 == !=<br>
+
 
 
 
@@ -1908,7 +2295,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 ||<br>
+
 
 
 
@@ -1916,7 +2305,9 @@ must exist; otherwise a compile-time error results.</p>
 
 
 
+
 = *= /= %= += -= &amp;= |=</code></p>
+
 
 
 
@@ -1926,12 +2317,15 @@ left-associative.</p>
 
 
 
+
 <p>Note that the <code>&amp;</code> and <code>|</code> operators have higher 
 precedence than <code>==</code> and <code>!=</code> (unlike in C, Java and C#).</p>
 
 
 
+
 <h3>Order of evaluation</h3>
+
 
 
 
@@ -1943,14 +2337,17 @@ invocation of the form</p>
 
 
 
+
 <p>&nbsp;&nbsp;&nbsp;&nbsp;<i>primary</i> <code>.</code> <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
 <code>)</code></p>
+
 
 
 
 <p>the <i>primary</i> is first evaluated to produce an <i>l-value</i>, then each 
 argument in turn is evaluated from left to right, and finally the method 
 invocation is performed.</p>
+
 
 
 
@@ -1961,7 +2358,9 @@ the generated C++ code.</i></p>
 
 
 
+
 <h3>Literals</h3>
+
 
 
 
@@ -1969,7 +2368,9 @@ the generated C++ code.</i></p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>bool-literal</i><br>
+
 
 
 
@@ -1977,7 +2378,9 @@ the generated C++ code.</i></p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>char-literal</i><br>
+
 
 
 
@@ -1985,7 +2388,9 @@ the generated C++ code.</i></p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>null-literal</i></p>
+
 
 
 
@@ -1994,7 +2399,9 @@ string</code> or <code>null</code> value may appear inside an expression.</p>
 
 
 
+
 <h3>L-values</h3>
+
 
 
 
@@ -2002,7 +2409,9 @@ string</code> or <code>null</code> value may appear inside an expression.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>simple-name</i><br>
+
 
 
 
@@ -2010,7 +2419,9 @@ string</code> or <code>null</code> value may appear inside an expression.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>index-access</i></p>
+
 
 
 
@@ -2018,7 +2429,9 @@ string</code> or <code>null</code> value may appear inside an expression.</p>
 
 
 
+
 <ul>
+
 
 
 
@@ -2026,7 +2439,9 @@ string</code> or <code>null</code> value may appear inside an expression.</p>
 
 
 
+
 	<li>member accesses of the form <i>expression </i>. <i>id</i></li>
+
 
 
 
@@ -2035,7 +2450,9 @@ string</code> or <code>null</code> value may appear inside an expression.</p>
 
 
 
+
 </ul>
+
 
 
 
@@ -2043,6 +2460,7 @@ string</code> or <code>null</code> value may appear inside an expression.</p>
 -- for example, on the left-hand side of an assignment statement, as a <code>ref</code> 
 or <code>out</code> argument in a method invocation, or in a <code>take</code> 
 expression.</p>
+
 
 
 
@@ -2054,7 +2472,9 @@ and the type of that location are always known at compile time.</p>
 
 
 
+
 <h4>Simple names</h4>
+
 
 
 
@@ -2062,11 +2482,14 @@ and the type of that location are always known at compile time.</p>
 
 
 
+
 <p>A <i>simple name</i> refers to any of the following:</p>
 
 
 
+
 <ul>
+
 
 
 
@@ -2075,11 +2498,14 @@ parameter</li>
 
 
 
+
 	<li>an instance field or instance property of <code>this</code></li>
 
 
 
+
 	<li>a static field or static property of the enclosing class</li>
+
 
 
 
@@ -2088,7 +2514,9 @@ parameter</li>
 
 
 
+
 </ul>
+
 
 
 
@@ -2102,7 +2530,9 @@ name <i>id</i>.</p>
 
 
 
+
 <h4>Member access: the . operator</h4>
+
 
 
 
@@ -2110,11 +2540,14 @@ name <i>id</i>.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>primary</i> . <i>id<br>
 
 
 
+
 &nbsp;&nbsp;&nbsp; </i><code>base</code><i> . id</i></p>
+
 
 
 
@@ -2124,7 +2557,9 @@ is a <i>simple-name</i> naming the class containing the field or property.</p>
 
 
 
+
 <h4>Index access: the [] operator</h4>
+
 
 
 
@@ -2132,11 +2567,14 @@ is a <i>simple-name</i> naming the class containing the field or property.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>primary</i> <code>[</code> <i>expression</i> <code>]<br>
 
 
 
+
 &nbsp; base [</code> <i>expression</i> <code>]</code> </p>
+
 
 
 
@@ -2145,7 +2583,9 @@ indexer access.</p>
 
 
 
+
 <h3>Method invocation</h3>
+
 
 
 
@@ -2153,7 +2593,9 @@ indexer access.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; expression<br>
+
 
 
 
@@ -2161,11 +2603,14 @@ indexer access.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; </i><code>out</code><i> l-value</i></p>
 
 
 
+
 <p><i>invocation-expression</i>:<br>
+
 
 
 
@@ -2174,8 +2619,10 @@ indexer access.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp;&nbsp;<i>primary</i> <code>.</code> <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
 <code>)</code><br>
+
 
 
 
@@ -2184,8 +2631,10 @@ indexer access.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>predefined-type</i> <code>.</code> <i>id</i> <code>(</code> <i>
 argument*<sub>list</sub></i> <code>)</code></p>
+
 
 
 
@@ -2195,7 +2644,9 @@ a method M applicable to the given argument list.</p>
 
 
 
+
 <h3><a name="simple assignment"></a>Simple assignment</h3>
+
 
 
 
@@ -2203,11 +2654,14 @@ a method M applicable to the given argument list.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; l-value</i> <code>=</code> <i>expression</i></p>
 
 
 
+
 <p>A <i>simple assignment</i> assigns a new value to a location.</p>
+
 
 
 
@@ -2218,7 +2672,9 @@ parameter, and which can be produced using the following grammar:</p>
 
 
 
+
 <p><i>local-expression</i>:<br>
+
 
 
 
@@ -2226,7 +2682,9 @@ parameter, and which can be produced using the following grammar:</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>(</code> <i>type</i> <code>)</code> <i>local-expression</i><br>
+
 
 
 
@@ -2234,8 +2692,10 @@ parameter, and which can be produced using the following grammar:</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>expression</i> <code>?</code> <i>local-expression</i>
 <code>:</code> <i>local-expression</i></p>
+
 
 
 
@@ -2249,11 +2709,14 @@ implicit conversion rules.</p>
 
 
 
+
 <h3>Compound assignment</h3>
 
 
 
+
 <p><i>compound-operator</i>: one of<br>
+
 
 
 
@@ -2262,7 +2725,9 @@ implicit conversion rules.</p>
 
 
 
+
 <p><i>compound assignment</i>:<br>
+
 
 
 
@@ -2270,7 +2735,9 @@ implicit conversion rules.</p>
 
 
 
+
 <h3>++/-- operators</h3>
+
 
 
 
@@ -2278,7 +2745,9 @@ implicit conversion rules.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; </i><code>++</code> <i>l-value</i></p>
+
 
 
 
@@ -2286,7 +2755,9 @@ implicit conversion rules.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; </i><code>--</code> <i>l-value</i></p>
+
 
 
 
@@ -2294,7 +2765,9 @@ implicit conversion rules.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; l-value </i><code>++</code></p>
+
 
 
 
@@ -2302,7 +2775,9 @@ implicit conversion rules.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; l-value </i><code>--</code></p>
+
 
 
 
@@ -2311,7 +2786,9 @@ implicit conversion rules.</p>
 
 
 
+
 <h3>The ?: operator</h3>
+
 
 
 
@@ -2319,22 +2796,26 @@ implicit conversion rules.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>expression</i> ? <i>expression</i> : <i>expression</i></p>
 
 
 
-<p>In the expression <code>e ? f : gel2</code>, let T<sub>f</sub> and T<sub>gel2</sub> 
-be the types of <code>f</code> and <code>gel2</code>, respectively.&nbsp; Then T<sub>f
-</sub>and T<sub>gel2</sub> must be either both owning or both non-owning; otherwise 
+
+<p>In the expression <code>e ? f : g</code>, let T<sub>f</sub> and T<sub>g</sub> 
+be the types of <code>f</code> and <code>g</code>, respectively.&nbsp; Then T<sub>f
+</sub>and T<sub>g</sub> must be either both owning or both non-owning; otherwise 
 a compile-time error occurs.&nbsp; If T<sub>f</sub> is implicitly convertible to 
-T<sub>gel2</sub>, then the type of the conditional-expression is T<sub>gel2</sub>.&nbsp; 
-Otherwise, if T<sub>gel2</sub> is implicitly convertible to T<sub>f</sub>, then 
+T<sub>g</sub>, then the type of the conditional-expression is T<sub>g</sub>.&nbsp; 
+Otherwise, if T<sub>g</sub> is implicitly convertible to T<sub>f</sub>, then 
 type of the conditional-expression is T<sub>f</sub>.&nbsp; Otherwise a 
 compile-time error occurs.</p>
 
 
 
+
 <h3>this</h3>
+
 
 
 
@@ -2343,12 +2824,15 @@ method was invoked.&nbsp; It may not appear in a static context.</p>
 
 
 
+
 <p>Inside a method defined inside class C, <code>this</code> has 
 (the non-owning) type C.&nbsp; </p>
 
 
 
+
 <h3>base</h3>
+
 
 
 
@@ -2359,12 +2843,15 @@ implementation of the same method, property, or indexer.</p>
 
 
 
+
 <p>More formally, a method, property or indexer invocation through <code>base</code> 
 is exactly the same as an invocation through <code>this</code>, except that</p>
 
 
 
+
 <ul>
+
 
 
 
@@ -2373,8 +2860,10 @@ is exactly the same as an invocation through <code>this</code>, except that</p>
 
 
 
+
 	<li>the member invoked at run time is always the same one found at compile 
 	time, even if the member is <code>virtual</code> .</li>
+
 
 
 
@@ -2382,7 +2871,9 @@ is exactly the same as an invocation through <code>this</code>, except that</p>
 
 
 
+
 <h3>Type casts</h3>
+
 
 
 
@@ -2390,7 +2881,9 @@ is exactly the same as an invocation through <code>this</code>, except that</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>(</code> <i>concrete-type</i> <code>)</code> <i>unary</i></p>
+
 
 
 
@@ -2400,7 +2893,9 @@ fails, a run-time error occurs and the program is terminated.</p>
 
 
 
+
 <h3>The is operator</h3>
+
 
 
 
@@ -2408,7 +2903,9 @@ fails, a run-time error occurs and the program is terminated.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>expression</i> <code>is</code> <i>concrete-type</i></p>
+
 
 
 
@@ -2417,7 +2914,9 @@ fails, a run-time error occurs and the program is terminated.</p>
 
 
 
+
 <pre>class Foo { ... }<br>class Bar : Foo { ... }</pre>
+
 
 
 
@@ -2425,7 +2924,9 @@ fails, a run-time error occurs and the program is terminated.</p>
 
 
 
+
 <p><code>e is T</code> evaluates to <code>false</code> if <code>e</code> is <code>null</code>.</p>
+
 
 
 
@@ -2433,11 +2934,14 @@ fails, a run-time error occurs and the program is terminated.</p>
 
 
 
+
 <p><i>as-expression</i>:<br>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>expression</i> <code>as</code> <i>concrete-type</i></p>
+
 
 
 
@@ -2448,7 +2952,9 @@ For example:</p>
 
 
 
+
 <pre>class Foo { ... }<br>class Bar : Foo { ... }</pre>
+
 
 
 
@@ -2456,11 +2962,14 @@ For example:</p>
 
 
 
+
 <h3>new</h3>
 
 
 
+
 <p><i>object-creation-expression</i>:<br>
+
 
 
 
@@ -2469,8 +2978,10 @@ For example:</p>
 
 
 
+
 </code>&nbsp;&nbsp;&nbsp; <i>primary</i><code> </code><samp>. </samp> <code>new</code> <i>id</i> <code>(</code> <i>argument*<sub>list</sub></i>
 <code>)</code> </p>
+
 
 
 
@@ -2478,7 +2989,9 @@ For example:</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>new</code> <i>type</i> <code>[</code> <i>expression</i> <code>]</code></p>
+
 
 
 
@@ -2486,6 +2999,7 @@ For example:</p>
 in an <i>object-creation-expression</i> must name some class C.&nbsp; At compile time, GEL2 performs a <a href="#member%20lookup">member lookup</a> in C for a constructor 
 applicable to the given argument list.&nbsp; At run time, GEL2 allocates a new 
 object of type C and invokes the constructor to initialize it.</p>
+
 
 
 
@@ -2497,10 +3011,12 @@ non-owning pointer of type C.</p>
 
 
 
+
 <p>The <i>array-creation-expression</i> <code>new T [ e ]</code> has type <code>
 T [] ^</code> .&nbsp; The expression creates a new array with <code>e</code> 
 elements and returns an owning pointer to it.&nbsp; Every element in the array 
 is initialized with <code>T</code>'s default value.</p>
+
 
 
 
@@ -2509,7 +3025,9 @@ and C#.&nbsp; Compare the following statements.</p>
 
 
 
+
 <pre>int [][] a = new int[4][];    // Java, C#</pre>
+
 
 
 
@@ -2517,9 +3035,11 @@ and C#.&nbsp; Compare the following statements.</p>
 
 
 
+
 <p><i>At the moment GEL2 implements the Java/C#-style array allocation syntax, and 
-can't allocate an array whose elements are owning arrays, e.gel2. an array of type
+can't allocate an array whose elements are owning arrays, e.g. an array of type
 </i><code>int&nbsp;[]&nbsp;^ []</code><i>.&nbsp; This is a bug.</i></p>
+
 
 
 
@@ -2527,11 +3047,14 @@ can't allocate an array whose elements are owning arrays, e.gel2. an array of ty
 
 
 
+
 <p><i>take-expression</i>:<br>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>take</code> <i>l-value</i></p>
+
 
 
 
@@ -2542,8 +3065,10 @@ object previously held in the variable.</p>
 
 
 
+
 <p>For more information, see the section <a href="#take">The take operator</a> 
 in the overview above.</p>
+
 
 
 
@@ -2551,7 +3076,9 @@ in the overview above.</p>
 
 
 
+
 <p><i>unary-operator</i>: one of<br>
+
 
 
 
@@ -2559,7 +3086,9 @@ in the overview above.</p>
 
 
 
+
 <p><i>unary-operator-expression:<br>
+
 
 
 
@@ -2567,7 +3096,9 @@ in the overview above.</p>
 
 
 
+
 <p><i>binary-operator</i>: one of<br>
+
 
 
 
@@ -2575,11 +3106,14 @@ in the overview above.</p>
 
 
 
+
 <p><i>binary-operator-expression:</i><br>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>expression binary-operator expression</i></p>
+
 
 
 
@@ -2590,6 +3124,7 @@ float</code>, <code>
 int</code> and <code>string</code>.&nbsp; Some operators are <dfn>overloaded</dfn>: 
 they have several definitions which take different argument types.&nbsp; GEL2 
 always chooses a particular operator overload at compile time.</p>
+
 
 
 
@@ -2605,11 +3140,14 @@ always exist for any operator invocation.</p>
 
 
 
+
 <h3>Object equality</h3>
 
 
 
+
 <p><i>object</i> == <i>object</i></p>
+
 
 
 
@@ -2619,8 +3157,10 @@ simple pointer comparison.</p>
 
 
 
+
 <p>Boxing a simple value yields a unique object: <code>(object) 3 == (object) 3</code> 
 evaluates to false.</p>
+
 
 
 
@@ -2628,7 +3168,9 @@ evaluates to false.</p>
 
 
 
+
 <h4>Boolean equality</h4>
+
 
 
 
@@ -2636,7 +3178,9 @@ evaluates to false.</p>
 
 
 
+
 <h4>Logical negation (!)</h4>
+
 
 
 
@@ -2644,7 +3188,9 @@ evaluates to false.</p>
 
 
 
+
 <h4>Conditional logical operators: &amp;&amp; and ||</h4>
+
 
 
 
@@ -2652,7 +3198,9 @@ evaluates to false.</p>
 
 
 
+
 <p><i>bool</i> <code>||</code> <i>bool</i></p>
+
 
 
 
@@ -2660,7 +3208,9 @@ evaluates to false.</p>
 
 
 
+
 <p><i>bool</i> <code>&amp;</code> <i>bool</i></p>
+
 
 
 
@@ -2668,7 +3218,9 @@ evaluates to false.</p>
 
 
 
+
 <h3>Integer operators</h3>
+
 
 
 
@@ -2676,7 +3228,9 @@ evaluates to false.</p>
 
 
 
+
 <p><i>int</i> <code>==</code> <i>int<br>
+
 
 
 
@@ -2684,7 +3238,9 @@ int </i><code>!=</code><i> int<br>
 
 
 
+
 int </i><code>&lt;</code><i> int<br>
+
 
 
 
@@ -2692,7 +3248,9 @@ int </i><code>&gt;</code><i> int<br>
 
 
 
+
 int </i><code>&lt;=</code><i> int<br>
+
 
 
 
@@ -2700,7 +3258,9 @@ int <code>&gt;=</code> int</i></p>
 
 
 
+
 <h4>Integer arithmetic</h4>
+
 
 
 
@@ -2708,7 +3268,9 @@ int <code>&gt;=</code> int</i></p>
 
 
 
+
 int</i> <code>-</code> <i>int<br>
+
 
 
 
@@ -2716,7 +3278,9 @@ int</i> <code>*</code> <i>int<br>
 
 
 
+
 int</i> <code>/</code> <i>int<br>
+
 
 
 
@@ -2724,8 +3288,10 @@ int</i> % <i>int</i></p>
 
 
 
+
 <p>The addition, subtraction and multiplication operators perform signed 32-bit integer 
 operations; overflow is not detected.</p>
+
 
 
 
@@ -2737,9 +3303,11 @@ If a program attempts to perform an integer division <i>a</i> / <i>b</i> where
 
 
 
+
 <p>For integers a and b, the remainder a <code>%</code> b yields a <code>-</code> (a <code>/</code> b) 
 <code>*</code> b .&nbsp; For all integers a and b, a <code>%</code> b &equiv; a (mod 
 b) .</p>
+
 
 
 
@@ -2747,7 +3315,9 @@ b) .</p>
 
 
 
+
 <p><code>-</code> <i>int</i></p>
+
 
 
 
@@ -2755,7 +3325,9 @@ b) .</p>
 
 
 
+
 <p><code>~</code> <i>int</i></p>
+
 
 
 
@@ -2763,7 +3335,9 @@ b) .</p>
 
 
 
+
 <p><i>int</i> <code>&amp;</code> <i>int</i></p>
+
 
 
 
@@ -2771,7 +3345,9 @@ b) .</p>
 
 
 
+
 <h4>Shift operators</h4>
+
 
 
 
@@ -2779,7 +3355,9 @@ b) .</p>
 
 
 
+
 <p><i>int</i> &gt;&gt; <i>int</i></p>
+
 
 
 
@@ -2787,8 +3365,10 @@ b) .</p>
 
 
 
+
 <p>The &lt;&lt; operator shifts its left operand left by a number of bits specified by 
 the right operand, filling in bits on the right with 0.</p>
+
 
 
 
@@ -2799,12 +3379,15 @@ left with 0, and otherwise it fills in bits on the left with 1.</p>
 
 
 
+
 <p><i>We should enhance GEL2 so that it has both arithmetic and logical right 
 shifts.</i></p>
 
 
 
+
 <h3>Floating-point operators</h3>
+
 
 
 
@@ -2813,7 +3396,9 @@ also NaN.</p>
 
 
 
+
 <p>Evaluating a floating-point operator will never result in a runtime error.</p>
+
 
 
 
@@ -2821,7 +3406,9 @@ also NaN.</p>
 
 
 
+
 <p><i>float</i> <code>==</code> <i>float<br>
+
 
 
 
@@ -2829,7 +3416,9 @@ double</i> <code>==</code> <i>double</i></p>
 
 
 
+
 <p><i>float</i> <code>!=</code><i> float<br>
+
 
 
 
@@ -2837,7 +3426,9 @@ double</i> <code>!=</code><i> double</i></p>
 
 
 
+
 <p><i>float</i> <code>&lt;</code><i> float<br>
+
 
 
 
@@ -2845,7 +3436,9 @@ double</i> <code>&lt;</code><i> double</i></p>
 
 
 
+
 <p><i>float</i> <code>&gt;</code><i> float<br>
+
 
 
 
@@ -2853,7 +3446,9 @@ double</i> <code>&gt;</code><i> double</i></p>
 
 
 
+
 <p><i>float</i> <code>&lt;=</code><i> float<br>
+
 
 
 
@@ -2861,7 +3456,9 @@ double</i> <code>&lt;=</code><i> double</i></p>
 
 
 
+
 <p><i>float</i> <i><code>&gt;=</code> float<br>
+
 
 
 
@@ -2869,7 +3466,9 @@ double</i> <i><code>&gt;=</code> double</i></p>
 
 
 
+
 <h4>Floating-point arithmetic</h4>
+
 
 
 
@@ -2877,7 +3476,9 @@ double</i> <i><code>&gt;=</code> double</i></p>
 
 
 
+
 double</i> <code>+</code> <i>double</i></p>
+
 
 
 
@@ -2885,7 +3486,9 @@ double</i> <code>+</code> <i>double</i></p>
 
 
 
+
 double</i> <code>-</code> <i>double</i></p>
+
 
 
 
@@ -2893,7 +3496,9 @@ double</i> <code>-</code> <i>double</i></p>
 
 
 
+
 double</i> <code>*</code> <i>double</i></p>
+
 
 
 
@@ -2901,7 +3506,9 @@ double</i> <code>*</code> <i>double</i></p>
 
 
 
+
 double</i> <code>/</code> <i>double</i></p>
+
 
 
 
@@ -2910,7 +3517,9 @@ Infinity or -Infinity.</p>
 
 
 
+
 <h4>Floating-point unary minus</h4>
+
 
 
 
@@ -2918,7 +3527,9 @@ Infinity or -Infinity.</p>
 
 
 
+
 </i><code>-</code> <i>double</i></p>
+
 
 
 
@@ -2926,11 +3537,14 @@ Infinity or -Infinity.</p>
 
 
 
+
 <h4>String equality</h4>
 
 
 
+
 <p><i>string</i> == <i>string</i></p>
+
 
 
 
@@ -2939,7 +3553,9 @@ of exactly the same sequence of characters.</p>
 
 
 
+
 <h4>String concatenation</h4>
+
 
 
 
@@ -2947,11 +3563,14 @@ of exactly the same sequence of characters.</p>
 
 
 
+
 <p><i>string</i> + <i>object</i></p>
 
 
 
+
 <p><i>object</i> + <i>string</i></p>
+
 
 
 
@@ -2962,7 +3581,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 <h2><a name="statements"></a>Statements</h2>
+
 
 
 
@@ -2970,7 +3591,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>block</i><br>
+
 
 
 
@@ -2978,7 +3601,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>expression-statement</i> ';'<br>
+
 
 
 
@@ -2986,7 +3611,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>switch-statement</i><br>
+
 
 
 
@@ -2994,7 +3621,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>do-statement</i><br>
+
 
 
 
@@ -3002,7 +3631,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>foreach-statement</i><br>
+
 
 
 
@@ -3010,7 +3641,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>continue-statement</i><br>
+
 
 
 
@@ -3018,7 +3651,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 <p><i>statement</i>:<br>
+
 
 
 
@@ -3026,7 +3661,9 @@ string by invoking the <code>ToString()</code> method on the object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>embedded-statement</i></p>
+
 
 
 
@@ -3035,7 +3672,9 @@ describe these in the sections that follow.</p>
 
 
 
+
 <h3>Blocks</h3>
+
 
 
 
@@ -3043,7 +3682,9 @@ describe these in the sections that follow.</p>
 
 
 
+
 </code>&nbsp;&nbsp;&nbsp; <code>{</code> <i>statement</i>* <code>}</code></p>
+
 
 
 
@@ -3052,8 +3693,10 @@ block are not visible outside it.</p>
 
 
 
+
 <p>On exit from a block, all variables declared in the block are destroyed in 
 reverse lexical order.</p>
+
 
 
 
@@ -3061,7 +3704,9 @@ reverse lexical order.</p>
 
 
 
+
 <p><i>empty-statement</i>:<br>
+
 
 
 
@@ -3069,7 +3714,9 @@ reverse lexical order.</p>
 
 
 
+
 <h3>Local variable declarations</h3>
+
 
 
 
@@ -3077,7 +3724,9 @@ reverse lexical order.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>=</code> <i>expression</i><br>
+
 
 
 
@@ -3085,7 +3734,9 @@ reverse lexical order.</p>
 
 
 
+
 <i>variable-declarator</i>:<br>
+
 
 
 
@@ -3093,7 +3744,9 @@ reverse lexical order.</p>
 
 
 
+
 <p><i>declaration_statement</i>:<br>
+
 
 
 
@@ -3102,7 +3755,9 @@ reverse lexical order.</p>
 
 
 
+
 <h3>Expression statements</h3>
+
 
 
 
@@ -3110,7 +3765,9 @@ reverse lexical order.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>invocation</i><br>
+
 
 
 
@@ -3118,7 +3775,9 @@ reverse lexical order.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>assignment</i><br>
+
 
 
 
@@ -3126,7 +3785,9 @@ reverse lexical order.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>pre-decrement-expression</i><br>
+
 
 
 
@@ -3134,7 +3795,9 @@ reverse lexical order.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>post-decrement-expression</i></p>
+
 
 
 
@@ -3143,7 +3806,9 @@ program.</p>
 
 
 
+
 <h3>if</h3>
+
 
 
 
@@ -3151,11 +3816,14 @@ program.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>else</code> <i>embedded-statement</i></p>
 
 
 
+
 <p><i>if-statement</i>:<code><br>
+
 
 
 
@@ -3164,7 +3832,9 @@ program.</p>
 
 
 
+
 <h3>switch</h3>
+
 
 
 
@@ -3172,7 +3842,9 @@ program.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>case</code> <i>constant-expression</i> <code>:</code><br>
+
 
 
 
@@ -3180,7 +3852,9 @@ program.</p>
 
 
 
+
 <p><i>switch-section</i>:<br>
+
 
 
 
@@ -3188,12 +3862,15 @@ program.</p>
 
 
 
+
 <p><i>switch-statement</i>:<br>
+
 
 
 
 &nbsp;&nbsp;&nbsp; <code>switch ( </code><i>expression</i> <code>) {</code> <i>switch-section</i>*
 <code>}</code></p>
+
 
 
 
@@ -3206,9 +3883,11 @@ labels have the same value then a compile-time error results.</p>
 
 
 
+
 <p>It is a compile-time error for the end of the statement list in any switch 
 section to be reachable.&nbsp; Typically each statement list will end with a
 <code>break;</code> statement.</p>
+
 
 
 
@@ -3217,7 +3896,9 @@ variables declared in a switch section are not visible outside the section.</p>
 
 
 
+
 <h3>while</h3>
+
 
 
 
@@ -3225,7 +3906,9 @@ variables declared in a switch section are not visible outside the section.</p>
 
 
 
+
 </code>&nbsp;&nbsp;&nbsp; <code>while (</code> <i>expression</i> <code>)</code>&nbsp; <i>embedded-statement</i></p>
+
 
 
 
@@ -3233,7 +3916,9 @@ variables declared in a switch section are not visible outside the section.</p>
 
 
 
+
 <p><i>do-statement</i>:<code><br>
+
 
 
 
@@ -3241,7 +3926,9 @@ variables declared in a switch section are not visible outside the section.</p>
 
 
 
+
 <h3>for</h3>
+
 
 
 
@@ -3249,7 +3936,9 @@ variables declared in a switch section are not visible outside the section.</p>
 
 
 
+
 </i> &nbsp;&nbsp;&nbsp; <i>type</i> <i>variable-declarator<br>
+
 
 
 
@@ -3258,7 +3947,9 @@ variables declared in a switch section are not visible outside the section.</p>
 
 
 
+
 <p><i>for-statement</i>:<code><br>
+
 
 
 
@@ -3268,8 +3959,10 @@ expression<sub>opt</sub></i> <code>;</code> <i>expression-statement<sub>opt</sub
 
 
 
+
 <p>A <code>for</code> statement creates a new lexical scope; any variable 
 declared in a <i>for-initializer</i> is visible only in that scope.</p>
+
 
 
 
@@ -3277,12 +3970,15 @@ declared in a <i>for-initializer</i> is visible only in that scope.</p>
 
 
 
+
 <p><i>foreach-statement</i>:<code><br>
+
 
 
 
 </code> &nbsp;&nbsp;&nbsp; <code>foreach (</code> <i>type</i> <i>id</i> <code>in</code> <i>expression</i>
 <code>)</code> <i>embedded-statement</i></p>
+
 
 
 
@@ -3292,6 +3988,7 @@ takes an <code>int</code> and returns a value of type T.&nbsp; The <code>foreach
 statement creates a new lexical scope and defines a new variable in that scope 
 with name <i>id</i> and type <i>type</i>.&nbsp; An explicit conversion from T to <i>
 type</i> must exist; otherwise a compile-time error results.</p>
+
 
 
 
@@ -3306,6 +4003,7 @@ executed.</p>
 
 
 
+
 <p>Inside a <code>foreach</code> statement, a <code>break</code> statement 
 causes execution of the <code>foreach</code> statement to complete immediately.&nbsp; 
 A <code>continue</code> statement aborts execution of the embedded statement; 
@@ -3313,7 +4011,9 @@ execution proceeds with the next loop iteration (if any).</p>
 
 
 
+
 <p>An example:</p>
+
 
 
 
@@ -3321,7 +4021,9 @@ execution proceeds with the next loop iteration (if any).</p>
 
 
 
+
 <h3>break</h3>
+
 
 
 
@@ -3329,7 +4031,9 @@ execution proceeds with the next loop iteration (if any).</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; break;</code></p>
+
 
 
 
@@ -3339,7 +4043,9 @@ foreach</code> statement.</p>
 
 
 
+
 <h3>continue</h3>
+
 
 
 
@@ -3347,7 +4053,9 @@ foreach</code> statement.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; continue;</code></p>
+
 
 
 
@@ -3356,7 +4064,9 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 <h3>return</h3>
+
 
 
 
@@ -3364,7 +4074,9 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>return;<br>
+
 
 
 
@@ -3372,7 +4084,9 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 <h2><a name="classes"></a>Classes</h2>
+
 
 
 
@@ -3380,7 +4094,9 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 <p><i>member-declaration</i>:<br>
+
 
 
 
@@ -3388,7 +4104,9 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 </i>&nbsp;&nbsp;&nbsp; <i>method-declaration<br>
+
 
 
 
@@ -3396,7 +4114,9 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 &nbsp;&nbsp;&nbsp; destructor-declaration<br>
+
 
 
 
@@ -3404,7 +4124,9 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 </i>&nbsp;&nbsp;&nbsp;&nbsp;<i>indexer-declaration</i></p>
+
 
 
 
@@ -3412,7 +4134,9 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 &nbsp;&nbsp;&nbsp; </i><code>:</code><i> id</i></p>
+
 
 
 
@@ -3420,8 +4144,10 @@ while</code>, <code>do</code>, <code>for</code>, or <code>foreach </code>stateme
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>abstract</code><i><sub>opt</sub></i> <code>extern</code><i><sub>opt</sub></i><code> class</code> <i>id</i> 
 <i>class-base<sub>opt</sub></i> <code>{</code> <i>member-declaration</i>* <code>}</code></p>
+
 
 
 
@@ -3431,13 +4157,16 @@ indexers.&nbsp; All of these are described in the following sections.</p>
 
 
 
+
 <p>Every class other than <code>object</code> has a base class.&nbsp; If a 
 class's declaration defines no base class, then the class's base class is <code>
 object</code> . </p>
 
 
 
+
 <p>An <code>abstract</code> class may not be instantiated directly.</p>
+
 
 
 
@@ -3446,7 +4175,9 @@ in an <code>extern</code> class declaration may not have a body.</p>
 
 
 
+
 <p>Members in a GEL2 class declaration may appear in any order.</p>
+
 
 
 
@@ -3454,7 +4185,9 @@ in an <code>extern</code> class declaration may not have a body.</p>
 
 
 
+
 <p><i>field-modifier</i>: one of<br>
+
 
 
 
@@ -3463,7 +4196,9 @@ readonly</code> <code>static</code></p>
 
 
 
+
 <p><i>array-initializer</i>:<br>
+
 
 
 
@@ -3472,11 +4207,14 @@ readonly</code> <code>static</code></p>
 
 
 
+
 <p><i>field-initializer</i>:<br>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>=</code> <i>expression<br>
+
 
 
 
@@ -3486,7 +4224,9 @@ array-initializer</i></p>
 
 
 
+
 <p><i>field-declarator</i>:<i><br>
+
 
 
 
@@ -3494,11 +4234,14 @@ array-initializer</i></p>
 
 
 
+
 <p><i>field-declaration</i>:<br>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>field-modifier* type field-declarator<b><sup>+</sup></b><sub>list</sub></i> <code>;</code></p>
+
 
 
 
@@ -3507,8 +4250,10 @@ or a <code>const</code> field.</p>
 
 
 
+
 <p>A field may not have the same name as any other field in the same class or in 
 any superclass.</p>
+
 
 
 
@@ -3520,6 +4265,7 @@ base class constructor.</p>
 
 
 
+
 <p>A <code>static</code> field may have an initializer containing an expression 
 to use in initializing the field.&nbsp; All <code>static</code> fields in a GEL2 
 program are initialized in lexical order before <code>Main</code> begins 
@@ -3527,9 +4273,11 @@ execution.</p>
 
 
 
+
 <p>A <code>static</code> field of owning array type may have an array initializer 
 containing a list of values to use to initialize the array.&nbsp; Every expression in an 
 array initializer must evaluate to a constant at compile time.</p>
+
 
 
 
@@ -3541,9 +4289,11 @@ field's value at compile time.</p>
 
 
 
+
 <p><i>GEL2 does not (yet) have <code>enum</code> types as found in other popular 
 languages; for now, a GEL2 programmer can imitate <code>enum</code> using a class 
 containing only <code>public const int</code> fields.</i></p>
+
 
 
 
@@ -3551,7 +4301,9 @@ containing only <code>public const int</code> fields.</i></p>
 
 
 
+
 <p><i>method-modifier</i>: one of<code><br>
+
 
 
 
@@ -3560,7 +4312,9 @@ protected</code> <code>public</code> <code>static</code> <code>virtual</code></p
 
 
 
+
 <p><i>parameter-modifier</i>: one of<code><br>
+
 
 
 
@@ -3568,7 +4322,9 @@ protected</code> <code>public</code> <code>static</code> <code>virtual</code></p
 
 
 
+
 </code>&nbsp;&nbsp;&nbsp; <code>out</code></p>
+
 
 
 
@@ -3576,7 +4332,9 @@ protected</code> <code>public</code> <code>static</code> <code>virtual</code></p
 
 
 
+
 <p><i>method-body</i>:<br>
+
 
 
 
@@ -3584,11 +4342,14 @@ protected</code> <code>public</code> <code>static</code> <code>virtual</code></p
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>;</code></p>
 
 
 
+
 <p><i>method-declaration</i>:<br>
+
 
 
 
@@ -3597,7 +4358,9 @@ protected</code> <code>public</code> <code>static</code> <code>virtual</code></p
 
 
 
+
 <p>A <i>method-declaration </i>declares a method in a class.</p>
+
 
 
 
@@ -3605,6 +4368,7 @@ protected</code> <code>public</code> <code>static</code> <code>virtual</code></p
 invoking a <code>virtual</code> method on an object, GEL2 uses the object's 
 run-time type to dispatch the invocation either to the method itself or to one 
 of its overrides.&nbsp; A <code>virtual</code> method may not be <code>private</code>.</p>
+
 
 
 
@@ -3617,10 +4381,12 @@ as the method it overrides.</p>
 
 
 
+
 <p>The programmer must specify the <code>override</code> keyword when overriding 
 a method.&nbsp; If <code>override</code> is not specified for a method and some 
 superclass contains a method with an identical signature, a compile-time error 
 occurs.</p>
+
 
 
 
@@ -3631,13 +4397,16 @@ class.&nbsp; An <code>abstract</code> method may not be <code>private</code>.</p
 
 
 
+
 <p>A <code>ref</code> parameter indicates that an argument is passed by 
 reference: the caller must specify the <code>ref</code> keyword and an <i>
 l-value</i>, which the method may modify.&nbsp; For example:</p>
 
 
 
+
 <pre>void Swap(ref int a, ref int b) {<br>  int t = a;<br>  a = b;<br>  b = t;<br>}<br><br>void Fun() {<br>  int x = 3, y = 4;<br>  Swap(ref x, ref y);<br>  Console.WriteLine("x = {0}, y = {1}", x, y);  // writes "x = 4, y = 3"<br>}</pre>
+
 
 
 
@@ -3647,7 +4416,9 @@ which the method must set (and may not read).&nbsp; For example:</p>
 
 
 
+
 <pre>void Power(int x, out int y, out int z) {<br>  y = x * x;<br>  z = x * x * x;<br>}</pre>
+
 
 
 
@@ -3655,7 +4426,9 @@ which the method must set (and may not read).&nbsp; For example:</p>
 
 
 
+
 <h3>Constructors</h3>
+
 
 
 
@@ -3663,11 +4436,14 @@ which the method must set (and may not read).&nbsp; For example:</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>protected public</code></p>
 
 
 
+
 <p><i>constructor-initializer</i>:<br>
+
 
 
 
@@ -3676,8 +4452,10 @@ which the method must set (and may not read).&nbsp; For example:</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; :<code> this</code> <code>(</code> <i>argument<sup>*</sup><sub>list</sub></i>
 <code>)</code></p>
+
 
 
 
@@ -3685,11 +4463,14 @@ which the method must set (and may not read).&nbsp; For example:</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; block</i></p>
 
 
 
+
 <p><i>constructor-declaration</i>:<br>
+
 
 
 
@@ -3699,7 +4480,9 @@ constructor-initializer<sub>opt</sub></i> <i>constructor-body</i></p>
 
 
 
+
 <p>A <dfn>constructor</dfn> is used to initialize a newly allocated object.</p>
+
 
 
 
@@ -3713,6 +4496,7 @@ initializer is equivalent to one with the initializer <code>: base ( )</code>. <
 
 
 
+
 <p>A constructor initializer includes a (possibly empty) set of arguments which 
 are passed to the base constructor.&nbsp; Initializer arguments are evaluated in 
 a static context: they may not refer to <code>this</code> or to instance fields.&nbsp; 
@@ -3721,11 +4505,14 @@ a base constructor applicable to the given initializer arguments.</p>
 
 
 
+
 <p>At run time, a constructor in class C executes as follows:</p>
 
 
 
+
 <ol>
+
 
 
 
@@ -3736,8 +4523,10 @@ a base constructor applicable to the given initializer arguments.</p>
 
 
 
+
 	<li>The base constructor is invoked; it will itself run the steps in this 
 	list.</li>
+
 
 
 
@@ -3745,7 +4534,9 @@ a base constructor applicable to the given initializer arguments.</p>
 
 
 
+
 </ol>
+
 
 
 
@@ -3753,7 +4544,9 @@ a base constructor applicable to the given initializer arguments.</p>
 
 
 
+
 <p><i>Destructors are not implemented yet.</i></p>
+
 
 
 
@@ -3761,7 +4554,9 @@ a base constructor applicable to the given initializer arguments.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; </i><code>~</code><i> id </i><code>( )</code><i> block</i></p>
+
 
 
 
@@ -3770,7 +4565,9 @@ object.</p>
 
 
 
+
 <p>A destructor must have the same name as its enclosing class.</p>
+
 
 
 
@@ -3778,7 +4575,9 @@ object.</p>
 
 
 
+
 <p><i>accessor</i>:<br>
+
 
 
 
@@ -3786,7 +4585,9 @@ object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>set</code> <i>method-body</i></p>
+
 
 
 
@@ -3794,8 +4595,10 @@ object.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>method-modifier</i><sup>*</sup> <i>type</i> <i>id</i>
 <code>{</code> <i>accessor accessor<sub>opt</sub></i> <code>}</code></p>
+
 
 
 
@@ -3805,11 +4608,14 @@ example:</p>
 
 
 
+
 <pre>class Foo {<br>  int i_;<br><br>  public int Count {<br>    get { return ++i_; }<br>    set { i_ = value; }<br>  }<br><br>  public static void Main() {<br>    Foo ^f = new Foo();<br>    f.Count = 4;<br>    Console.WriteLine(f.Count);<br>    Console.WriteLine(f.Count);<br>  }<br>}</pre>
 
 
 
+
 <p>When run, the program prints the numbers 5 and 6.</p>
+
 
 
 
@@ -3822,11 +4628,14 @@ accessor, or both.</p>
 
 
 
+
 <h3>Indexers</h3>
 
 
 
+
 <p><i>indexer-modifier</i>: one of<code><br>
+
 
 
 
@@ -3835,7 +4644,9 @@ protected</code> <code>public</code> <code>static</code> <code>virtual</code></p
 
 
 
+
 <p><i>indexer-declaration</i>:<br>
+
 
 
 
@@ -3845,8 +4656,10 @@ protected</code> <code>public</code> <code>static</code> <code>virtual</code></p
 
 
 
+
 <p>An indexer is accessed using the same syntax to access array elements, but an 
 indexer can run arbitrary code when it is read or set.&nbsp; For example:</p>
+
 
 
 
@@ -3854,7 +4667,9 @@ indexer can run arbitrary code when it is read or set.&nbsp; For example:</p>
 
 
 
+
 <p>When run, the program prints the numbers 4 and 2.</p>
+
 
 
 
@@ -3866,7 +4681,9 @@ a <code>get</code> accessor, a <code>set</code> accessor, or both.</p>
 
 
 
+
 <p>An indexer may not be <code>static</code>.</p>
+
 
 
 
@@ -3874,7 +4691,9 @@ a <code>get</code> accessor, a <code>set</code> accessor, or both.</p>
 
 
 
+
 <p><i>dummy-namespace-name</i>:<br>
+
 
 
 
@@ -3882,7 +4701,9 @@ a <code>get</code> accessor, a <code>set</code> accessor, or both.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>dummy-namespace-name</i> <code>.</code> <i>id</i></p>
+
 
 
 
@@ -3890,13 +4711,17 @@ a <code>get</code> accessor, a <code>set</code> accessor, or both.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <code>import</code> <i>string-literal</i> <code>;</code><br>
+
 
 
 <code><br>
 
 
+
 </code></p>
+
 
 
 
@@ -3904,7 +4729,9 @@ a <code>get</code> accessor, a <code>set</code> accessor, or both.</p>
 
 
 
+
 &nbsp;&nbsp;&nbsp; <i>directive<sup>*</sup> class-declaration<sup>*</sup></i></p>
+
 
 
 
@@ -3913,16 +4740,19 @@ a set of class declarations.</p>
 
 
 
+
 <p>An <code>import</code> directive imports a file containing GEL2 or C++ code into 
 a GEL2 program.&nbsp; Importing a file is equivalent to providing its name on the 
-command line passed to <code>gel2 -c</code>.&nbsp; When a source file F uses an
+command line passed to <code>gel -c</code>.&nbsp; When a source file F uses an
 <code>import</code> directive to import a file, GEL2 first looks for the file in 
 the directory containing F; if the file is not found there then GEL2 looks in the 
 directory containing the GEL2 compiler.&nbsp; Importing a file multiple times is 
 equivalent to importing the file only once.</p>
 
 
+
 <p>Class declarations in a GEL2 program may appear in any order.</p>
+
 
 
 
@@ -3932,11 +4762,14 @@ following signatures:</p>
 
 
 
+
 <pre>public static void Main();<br>public static void Main(string[] args);</pre>
 
 
 
+
 <h2><a name="predefined classes"></a>Predefined Classes</h2>
+
 
 
 
@@ -3945,7 +4778,9 @@ available in any GEL2 program.</p>
 
 
 
+
 <h3>Basic classes</h3>
+
 
 
 
@@ -3953,7 +4788,9 @@ available in any GEL2 program.</p>
 
 
 
+
 <pre>abstract class Object {<br>  public virtual bool Equals(Object o);<br>  public virtual int GetHashCode();<br>  public virtual string ToString();<br>}</pre>
+
 
 
 
@@ -3963,11 +4800,14 @@ are synonyms in GEL2.</p>
 
 
 
+
 <h4>Bool</h4>
 
 
 
+
 <pre>class Bool {<br>}</pre>
+
 
 
 
@@ -3976,11 +4816,14 @@ are synonyms in GEL2.</p>
 
 
 
+
 <h4>Char</h4>
 
 
 
+
 <pre>class Char {<br>  public static bool IsDigit(char c);<br>  public static bool IsLetter(char c);<br>  public static bool IsWhiteSpace(char c);<br>}</pre>
+
 
 
 
@@ -3989,7 +4832,9 @@ are synonyms in GEL2.</p>
 
 
 
+
 <h4>Int</h4>
+
 
 
 
@@ -3997,8 +4842,10 @@ are synonyms in GEL2.</p>
 
 
 
+
 <p>The <code>Int</code> class implements the simple type <code>int</code>.&nbsp;
 <code>Int</code> and <code>int</code> are synonyms in GEL2.</p>
+
 
 
 
@@ -4009,9 +4856,11 @@ returns 0.</p>
 
 
 
+
 <p>The static method <code>Parse(string s, int style)</code> parses either a 
 decimal or a hexadecimal integer as specified by <code>style</code>, which can 
 be either <code>NumberStyle.Integer</code> or <code>NumberStyle.HexNumber</code>.</p>
+
 
 
 
@@ -4019,11 +4868,14 @@ be either <code>NumberStyle.Integer</code> or <code>NumberStyle.HexNumber</code>
 
 
 
+
 <pre>class Array {<br>  public static void Copy(Array source, int source_index, Array dest, int dest_index, int length);<br>  public void CopyTo(Array array, int index);<br>  public int Length { get; }<br>}</pre>
 
 
 
+
 <p>The built-in class <code>Array</code> is the superclass of all array types.</p>
+
 
 
 
@@ -4034,11 +4886,14 @@ error occurs and execution is terminated.</p>
 
 
 
+
 <h4>String</h4>
 
 
 
+
 <pre>class String {<br>  public static string New(char[] a);<br><br>  public char this[int index] { get; }<br><br>  public static int CompareOrdinal(string s, string t);<br>  public bool EndsWith(string s);<br>  public static string Format(string s, object o0);<br>  public static string Format(string s, object o0, object o1);<br>  public static string Format(string s, object o0, object o1, object o2);<br>  public int IndexOf(char c);<br>  public int LastIndexOf(char c);<br>  public int Length { get; }<br>  public bool StartsWith(string s);<br>  public string Substring(int start_index, int length);<br>}</pre>
+
 
 
 
@@ -4047,8 +4902,10 @@ error occurs and execution is terminated.</p>
 
 
 
+
 <p>The static method <code>New</code> converts an array of characters to a <code>
 string</code>.</p>
+
 
 
 
@@ -4059,9 +4916,11 @@ t</code>.</p>
 
 
 
+
 <p>The <code>IndexOf</code> method returns the zero-based index of the first 
 occurrence of a character <code>c</code> in a string; if <code>c</code> does not 
 appear in the string at all, then <code>IndexOf</code> returns -1.</p>
+
 
 
 
@@ -4071,7 +4930,9 @@ appear in the string at all, then <code>LastIndexOf</code> returns -1.</p>
 
 
 
+
 <h5><a name="string formatting"></a>String formatting</h5>
+
 
 
 
@@ -4084,7 +4945,9 @@ method; object arguments are numbered starting with zero.&nbsp; For example:</p>
 
 
 
+
 <pre>string s = String.Format("how now {0} {1}", "brown", "cow");   // ==&gt; "how now brown cow" </pre>
+
 
 
 
@@ -4092,7 +4955,9 @@ method; object arguments are numbered starting with zero.&nbsp; For example:</p>
 
 
 
+
 <pre>class StringBuilder {<br>  public StringBuilder();<br>  public void Append(char c);<br>  public void Append(string s);<br>  public void AppendFormat(string s, object o0);<br>  public void AppendFormat(string s, object o0, object o1);<br>  public void AppendFormat(string s, object o0, object o1, object o2);<br>  public override string ToString();<br>}</pre>
+
 
 
 
@@ -4100,11 +4965,14 @@ method; object arguments are numbered starting with zero.&nbsp; For example:</p>
 
 
 
+
 <h4>Pool</h4>
 
 
 
+
 <pre>class Pool {<br>  public Pool();<br>}</pre>
+
 
 
 
@@ -4113,11 +4981,14 @@ method; object arguments are numbered starting with zero.&nbsp; For example:</p>
 
 
 
+
 <h4>Debug</h4>
 
 
 
+
 <pre>class Debug {<br>  public static void Assert(bool b);<br>}</pre>
+
 
 
 
@@ -4126,11 +4997,14 @@ program execution if its argument is <code>false</code>.</p>
 
 
 
+
 <h4>NumberStyles</h4>
 
 
 
+
 <pre>class NumberStyles {<br>  public const int Integer = 0, HexNumber = 1;<br>}</pre>
+
 
 
 
@@ -4139,7 +5013,9 @@ the <code>Int.Parse</code> method.</p>
 
 
 
+
 <h2><a name="library classes"></a>Library classes</h2>
+
 
 
 
@@ -4147,7 +5023,9 @@ the <code>Int.Parse</code> method.</p>
 
 
 
+
 <p>These classes are available in any program.</p>
+
 
 
 
@@ -4155,7 +5033,9 @@ the <code>Int.Parse</code> method.</p>
 
 
 
+
 <pre>class Console {<br>  public static void Write(object o);<br>  public static void Write(string s, object o0);<br>  public static void Write(string s, object o0, object o1);<br>  public static void Write(string s, object o0, object o1, object o2);<br><br>  public static void WriteLine(object o);<br>  public static void WriteLine(string s, object o0);<br>  public static void WriteLine(string s, object o0, object o1);<br>  public static void WriteLine(string s, object o0, object o1, object o2);<br>}</pre>
+
 
 
 
@@ -4165,11 +5045,14 @@ described in <a href="#string%20formatting">String formatting</a>, above.</p>
 
 
 
+
 <h4>File</h4>
 
 
 
+
 <pre>class File {<br>  public static void Delete(string path);<br>  public static bool Exists(string path);<br>  public static string ReadAllText(string path);<br>}</pre>
+
 
 
 
@@ -4178,8 +5061,10 @@ files.</p>
 
 
 
+
 <p>The <code>Delete</code> method deletes any file with the given name.&nbsp; If 
 no such file exists, no error is reported.</p>
+
 
 
 
@@ -4189,7 +5074,9 @@ It returns the read string.</p>
 
 
 
+
 <h4>Path</h4>
+
 
 
 
@@ -4197,8 +5084,10 @@ It returns the read string.</p>
 
 
 
+
 <p>The <code>Path</code> class contains static methods which operate on file 
 system paths.</p>
+
 
 
 
@@ -4208,7 +5097,9 @@ Path.GetFileNameWithoutExtension("/mydir/red.txt")</code> returns the string "<c
 
 
 
+
 <h4>StreamReader</h4>
+
 
 
 
@@ -4216,7 +5107,9 @@ Path.GetFileNameWithoutExtension("/mydir/red.txt")</code> returns the string "<c
 
 
 
+
 <p>A <code>StreamReader</code> is used to read from a file.</p>
+
 
 
 
@@ -4225,7 +5118,9 @@ If no such file exists, a run-time error occurs and the program is terminated.</
 
 
 
+
 <h4>StreamWriter</h4>
+
 
 
 
@@ -4233,7 +5128,9 @@ If no such file exists, a run-time error occurs and the program is terminated.</
 
 
 
+
 <p>A <code>StreamWriter</code> is used to write to a file.</p>
+
 
 
 
@@ -4242,7 +5139,9 @@ If no such file exists, a run-time error occurs and the program is terminated.</
 
 
 
+
 <h3>System classes</h3>
+
 
 
 
@@ -4250,11 +5149,14 @@ If no such file exists, a run-time error occurs and the program is terminated.</
 
 
 
+
 <h4>Environment</h4>
 
 
 
+
 <pre>class Environment {<br>  public static string CurrentDirectory { get; set; }<br>  public static string GetEnvironmentVariable(string value);<br>  public static void Exit(int code);<br>  public static OperatingSystem OSVersion { get; }<br>}</pre>
+
 
 
 
@@ -4263,11 +5165,14 @@ immediately, returning the given exit code to the operating system.</p>
 
 
 
+
 <h4>OperatingSystem</h4>
 
 
 
+
 <pre>extern class OperatingSystem {<br>  public int Platform { get; }<br>}</pre>
+
 
 
 
@@ -4277,11 +5182,14 @@ program is currently executing.</p>
 
 
 
+
 <h4>PlatformID</h4>
 
 
 
+
 <pre>extern class PlatformID {<br>  public const int Unix = 0, Win32NT = 1;<br>}</pre>
+
 
 
 
@@ -4290,11 +5198,14 @@ system platforms.</p>
 
 
 
+
 <h4>Process</h4>
 
 
 
+
 <pre>class Process {<br>  public int ExitCode { get; }<br>  public static Process GetCurrentProcess();<br>  public ProcessModule MainModule { get; }<br>  public static Process ^ Start(ProcessStartInfo start_info);<br>  public void WaitForExit();<br>}</pre>
+
 
 
 
@@ -4303,8 +5214,10 @@ process's exit code; it may be called only after a process has terminated.</p>
 
 
 
+
 <p>The <code>MainModule</code> property returns a <code>ProcessModule</code> 
 representing the executable file used to start the given process.</p>
+
 
 
 
@@ -4313,8 +5226,10 @@ representing the executable file used to start the given process.</p>
 
 
 
+
 <p>The <code>WaitForExit</code> method waits for 
 a process to terminate.</p>
+
 
 
 
@@ -4322,7 +5237,9 @@ a process to terminate.</p>
 
 
 
+
 <pre>class ProcessModule {<br>  public string FileName { get; }<br>}</pre>
+
 
 
 
@@ -4334,11 +5251,14 @@ process's executable file. </p>
 
 
 
+
 <h4>ProcessStartInfo</h4>
 
 
 
+
 <pre>class ProcessStartInfo {<br>  public ProcessStartInfo(string filename, string args);<br><br>  public bool UseShellExecute { set; }<br>}</pre>
+
 
 
 
@@ -4347,8 +5267,10 @@ process.</p>
 
 
 
+
 <p>The <code>UseShellExecute</code> property is ignored; it is provided for 
 compatibility with C#, which we've used to bootstrap the GEL2 compiler.</p>
+
 
 
 
@@ -4356,8 +5278,10 @@ compatibility with C#, which we've used to bootstrap the GEL2 compiler.</p>
 
 
 
-<p>To use GEL2's collection classes in a program, import <code>gel2_collection.gel2</code> 
+
+<p>To use GEL2's collection classes in a program, import <code>gel_collection.gel</code> 
 .</p>
+
 
 
 
@@ -4369,11 +5293,14 @@ V may be instantiated with either owning or non-owning types.</i></p>
 
 
 
+
 <h4>NonOwningArrayList</h4>
 
 
 
+
 <pre>class NonOwningArrayList {<br>  public int Count { get; }<br>  public object this[int index] { get; set; }<br>  public void Add(object o);<br>  public void RemoveAt(int index);<br>}</pre>
+
 
 
 
@@ -4382,11 +5309,14 @@ own its elements.</p>
 
 
 
+
 <h4>ArrayList</h4>
 
 
 
+
 <pre>class ArrayList {<br>  public int Count { get; }<br>  public object this[int index]; { get; }<br>  public object ^Take(int index);<br>  public void Add(object ^o);<br>}</pre>
+
 
 
 
@@ -4395,11 +5325,14 @@ elements.</p>
 
 
 
+
 <h4>Hashtable</h4>
 
 
 
+
 <pre>class Hashtable {<br>  public object this[object key] { get; }<br>  public void Set(object key, object ^value);<br>  public object ^Take(object key);<br>  public bool ContainsKey(object key);<br>}</pre>
+
 
 
 
@@ -4408,7 +5341,9 @@ owns its values but not its keys.</p>
 
 
 
+
 <p>&nbsp;</p>
+
 
 
 
