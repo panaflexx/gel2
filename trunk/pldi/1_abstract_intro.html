@@ -1,0 +1,323 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+
+
+
+  
+  
+  <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
+
+
+  
+
+
+  
+  
+  
+  <title>Safe Ownership-Based Memory Management</title>
+  <meta content="Adam Dingle" name="author">
+
+
+
+  
+  
+  <style type="text/css">
+h1 { font-size: 18pt;
+font-weight: bold;
+font-family: Arial,Helvetica,sans-serif;
+text-align: center;
+}
+.author { font-family: Arial,Helvetica,sans-serif;
+font-size: 12pt;
+text-align: center;
+}
+address { text-align: center;
+font-family: Arial,Helvetica,sans-serif;
+font-size: 10pt;
+font-style: normal;
+}
+body {
+font-size: 9pt;
+}
+h2 { font-family: Times New Roman,Times,serif;
+font-size: 12pt;
+font-weight: bold;
+}
+h3 { font-family: Times New Roman,Times,serif;
+font-size: 12pt;
+font-weight: bold;
+}
+h4 { font-family: Times New Roman,Times,serif;
+font-size: 11pt;
+font-style: italic;
+font-weight: normal;
+}
+  </style>
+</head>
+
+
+<body>
+
+
+
+<h1>Safe Ownership-Based Memory Management</h1>
+
+
+
+<div class="author">Adam Dingle<br>
+
+
+
+</div>
+
+
+
+<address>Google<br>
+
+
+
+1600 Amphitheatre Parkway<br>
+
+
+
+Mountain View, CA&nbsp; 94043<br>
+
+
+
++1 415 425 6891<br>
+
+
+
+</address>
+
+
+
+<div class="author">adamdingle@gmail.com</div>
+
+
+
+<h2>ABSTRACT</h2>
+
+
+
+We propose an automatic memory management
+mechanism based on ownership types and run-time reference
+counts.&nbsp; The type system distinguishes owning
+and non-owning pointers, and ensures that&nbsp;there is always
+exactly one owning pointer to every object. &nbsp;When an owning
+pointer is destroyed, the object it
+points to is destroyed as well.&nbsp; At run time, the language
+implementation keeps a reference
+count of the number of non-owning pointers to each object. &nbsp;If
+a destroyed object has a
+non-zero reference count, a run-time error occurs and the program is
+terminated; it is the programmer's responsibility to avoid this
+condition.<br>
+
+
+
+<br>
+
+
+
+This mechanism can be used to implement a safe programming
+language which frees objects deterministically and efficiently.
+&nbsp;To show this, we've designed and implemented a
+simple&nbsp;language, Gel,&nbsp;which is essentially a subset
+of C#
+extended with ownership-based memory management. &nbsp;We present
+Gel's
+type system and type conversion rules in detail. &nbsp;The Gel
+compiler and
+interpreter is implemented in Gel itself; we describe our experiences
+using the Gel type system for writing a program of this size.
+&nbsp;We
+explain how the Gel compiler&nbsp;uses ownership information to
+eliminate most reference counts at compile time, allowing many Gel
+programs to execute nearly as quickly as their manually managed
+counterparts. &nbsp;We present a number of benchmark results
+comparing
+the CPU usage and memory consumption of programs written in Gel, C++,
+Java and C#.
+<h2>Categories and Subject Descriptors</h2>
+
+
+
+D.3.3 [<span style="font-weight: bold;">Programming
+Languages</span>]: Language Constructs and Features -- <span style="font-style: italic;">dynamic storage management</span>;
+D.2.4 [<span style="font-weight: bold;">Software
+Engineering</span>]: Software/Program Verification<br>
+
+
+
+<h3>General Terms</h3>
+
+
+
+Design, Experimentation, Languages, Performance
+<h3>Keywords</h3>
+
+
+
+memory management, type safety, ownership, garbage collection
+<h3>INTRODUCTION</h3>
+
+
+
+Today, most system programming is done in languages which are <dfn>unsafe</dfn>:
+program errors may lead to arbitrary or undefined behavior.&nbsp; C
+and C++ are unsafe languages commonly used for system
+programming.&nbsp; Unsafe languages have certain fundamental
+disadvantages over <dfn>safe</dfn> languages [Pierce,
+2002] such as Java, C# and ML.&nbsp; Certain classes of bugs such
+as buffer overruns or reads from deallocated memory can occur only in
+unsafe languages.&nbsp; Many such bugs are subtle or
+non-deterministic, and hence expensive in software
+engineering.&nbsp; In addition, trusted and untrusted code may
+safely share a single address space only in a safe language.
+<p>There would thus be many advantages to using safe languages
+for system programming.&nbsp; But there are challenges involved in
+making safe languages as efficient as unsafe languages in their
+run-time resource usage.&nbsp; In particular, any safe language
+must have some sort of automatic memory management mechanism: explicit
+memory allocation and deallocation as found in C and C++ is inherently
+unsafe, as there is nothing to prevent a program from writing to
+deallocated memory.&nbsp; The most widely used automatic memory
+management mechanisms include classical reference counting and garbage
+collection [Jones, 1996].&nbsp; Reference counting may incur
+substantial run-time overhead and cannot easily free cyclic data
+structures.&nbsp; Garbage collected-systems often use substantially
+more memory than their manually managed counterparts.&nbsp; An
+additional disadvantage of garbage collection is that it frees memory
+non-deterministically.&nbsp; Deterministic destruction
+is&nbsp;useful in system programming, especially in languages in
+which allow arbitrary user code to run when objects are destroyed; such
+code may be used to release system resources when no longer needed.</p>
+
+
+
+<p>In this paper we propose an automatic memory management
+mechanism based on ownership types and run-time reference
+counts.&nbsp; The mechanism can be used to implement a safe
+language which frees objects deterministically.&nbsp; To show that
+the ownership mechanism is practical, we've constructed a simple
+object-oriented language Gel which is essentially a subset of C#
+extended with ownership-based memory management.&nbsp; We've
+implemented an interpreter and compiler for Gel, written in the Gel
+language itself.&nbsp;&nbsp; We've ported a number of common
+benchmark programs to Gel and have found that the Gel implementations
+often perform similarly to their C++ counterparts and use significantly
+less memory than their Java and C# equivalents.<br>
+
+
+
+</p>
+
+
+
+<h3>OWNERSHIP-BASED MEMORY MANAGEMENT</h3>
+
+
+
+<p>Our proposed memory management mechanism has the following
+fundamental characteristics:</p>
+
+
+
+<ul>
+
+
+
+  <li>Objects are allocated individually using a heap
+allocator.&nbsp; Deallocation is automatic; there is no <code>delete</code>
+statement.</li>
+
+
+
+  <li>The type system distinguishes <dfn>owning</dfn>
+and <dfn>non-owning</dfn> pointers to objects.&nbsp;
+This is a compile-time distinction only: at run time, all pointers are
+represented as ordinary memory addresses.</li>
+
+
+
+  <li>The type system ensures that at run time there is always
+exactly one owning pointer to every object.</li>
+
+
+
+  <li>Ownership of an object may <dfn>transfer </dfn>as
+a program runs.&nbsp; Any owning pointer which loses ownership of
+an object becomes null if it may be read again.</li>
+
+
+
+  <li>At run time, the language implementation keeps a reference
+count of the number of non-owning pointers to each object.</li>
+
+
+
+  <li>When a non-null owning pointer is destroyed, the object it
+points to is destroyed as well.&nbsp; If a destroyed object has a
+non-zero reference count, a run-time error occurs and the program is
+terminated; it is the programmer's responsibility to avoid this
+condition.</li>
+
+
+
+</ul>
+
+
+
+<p>Our goal in this work is to show that a safe language with
+such a
+type system and memory management mechanism can be implemented, and can
+be practical in the
+following senses:</p>
+
+
+
+<ul>
+
+
+
+  <li>It is easy to write real programs so that they pass the
+type checker; impementing common data structures is straightforward.</li>
+
+
+
+  <li>It is easy to write programs so that they never yield
+run-time errors due to non-zero reference counts on destroyed objects.</li>
+
+
+
+  <li>Programs run efficiently, ideally consuming roughly as much
+memory and CPU time as their manually managed counterparts.</li>
+
+
+
+</ul>
+
+
+
+<p>To this end, we've designed and implemented a simple
+object-oriented language, Gel, which uses ownership-based memory
+management.&nbsp; In the remainder of this paper we'll describe
+Gel in some detail and discuss how Gel performs on some
+real-world benchmarks.</p>
+
+
+
+<p>We could conceivably construct a minimal ownership-based type
+system based on a typed lambda calculus and provide formal proofs of
+type safety and other properties.&nbsp; We have not done that in
+this work, as our primary goal here is to demonstrate the viability of
+ownership-based memory management in a real-world
+implementation.&nbsp; We will not provide a&nbsp;proof of type
+safety for Gel, as the language is large enough that such a proof might
+be unwieldy.&nbsp; We nevertheless believe that the language as
+described is type safe.</p>
+<br>
+</body>
+</html>

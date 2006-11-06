@@ -1,0 +1,499 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+
+  <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
+  <title>Safe Ownership-Based Memory Management</title>
+
+
+  <meta content="Adam Dingle" name="author">
+
+  <style type="text/css">
+h1 { font-size: 18pt;
+font-weight: bold;
+font-family: Arial,Helvetica,sans-serif;
+text-align: center;
+}
+.author { font-family: Arial,Helvetica,sans-serif;
+font-size: 12pt;
+text-align: center;
+}
+address { text-align: center;
+font-family: Arial,Helvetica,sans-serif;
+font-size: 10pt;
+font-style: normal;
+}
+body {
+font-size: 9pt;
+}
+h2 { font-family: Times New Roman,Times,serif;
+font-size: 12pt;
+font-weight: bold;
+}
+h3 { font-family: Times New Roman,Times,serif;
+font-size: 12pt;
+font-weight: bold;
+}
+h4 { font-family: Times New Roman,Times,serif;
+font-size: 11pt;
+font-style: italic;
+font-weight: normal;
+}
+  </style>
+</head>
+
+
+<body>
+
+<h2>PERFORMANCE<br>
+</h2>
+
+In this section we discuss the performance of compiled Gel programs,
+and describe the results of benchmarking&nbsp;experiments comparing Gel's
+performance to C++, Java and C#.<br>
+<h3>Reference Count Overhead</h3>
+As described above, Gel keeps a count of non-owning pointers
+to every object. &nbsp;Gel's reference counts are significantly
+cheaper than those in a traditional reference-counted system, for three
+reasons:
+
+<ol>
+
+  <li>Gel doesn't need to keep reference counts for owning
+pointers; an object's reference count doesn't change as it is passed
+from owner to owner.&nbsp; In a traditional reference-counting
+system, a reference count is kept for every&nbsp;pointer to an
+object.</li>
+
+  <li>In Gel, a reference count decrement is simply an integer
+decrement, which may well be a single instruction.&nbsp; A
+traditional system must check whether a reference count is zero after
+each decrement; in Gel this is unnecessary because ownership, not the
+reference count, determines when it's time to free an object.</li>
+
+  <li>The Gel compiler can&nbsp;use ownership information to
+optimize away many reference counts at compile time in a
+single-threaded Gel program.</li>
+
+</ol>
+This last point deserves more explanation. &nbsp;The Gel compiler
+implements a reference count elimination optimization based on the
+following idea. &nbsp;Suppose that, for a type T, a given block of code
+never mutates any&nbsp;pointer of type U ^, where U is T, any
+superclass of T, or any subclass of T. &nbsp;Then the code cannot
+possibly destroy any object which can be held in a variable of type T,
+and therefore any non-owning variable or temporary of type T whose
+lifetime is contained in the block of code need not hold a reference
+count.<br>
+
+<br>
+As an example, consider the following loop, which iterates down a
+linked list, adding the integer values which are found in each node of
+the list;<br>
+
+<pre>Node ^first = construct();<br>int sum = 0;<br>for (Node n = first ; n != null ; n = n.next)<br>&nbsp; sum += n.i;<br></pre>
+
+A traditional reference-counted implementation would increment and then
+decrement the reference count of each node in the list as it is pointed
+to by the loop variable n. &nbsp;The Gel compiler can optimize these
+reference counts away: the variable n is live only during the loop
+execution, and no code in the loop mutates a owning pointer of type T
+^, where T is Node or any superclass or subclass of it (indeed, the
+code mutates no owning pointers at all.)&nbsp; And so no Node object
+can possibly be destroyed during the loop.<br>
+<br>
+The compiler implements this optimization&nbsp;interprocedurally.
+&nbsp;Suppose that we modify the loop body above to call n.Get(), where
+the Get()&nbsp;method merely returns the instance variable i.
+&nbsp;Then the optimization still holds, since the compiler recognizes
+that the Get() method also mutates no owning pointers of type Node.<br>
+<br>
+To implement this optimization, the compiler generates a call graph of
+all methods in the program being compiled. &nbsp;Using this graph, the
+compiler computes, for each method, the set of owning types which may
+be mutated during a call to M. &nbsp;When compiling each method, the
+compiler generates a graph of control flow in the method. &nbsp;For
+each non-owning local variable (or temporary value in a expression),
+the compiler examines the control flow nodes where the variable is live
+and generates the set of owning types which may be mutated during the
+variable's lifetime, including types which may be mutated during method
+calls invoked from those nodes. &nbsp;If none of these types are a
+supertype or subtype of the variable's own type, the compiler does not
+bother to count references from the variable to any object.<br>
+<h4>Multithreading</h4>
+An important caveat applies to the reference count optimization described in the previous section: <span style="font-style: italic;">it applies only to single-threaded programs</span>.
+&nbsp; In a multithreaded program, when optimizing a block of code
+which will run in one thread, the compiler cannot know in general
+whether some other thread might be mutating a graph of objects, and
+therefore cannot eliminate reference counts. &nbsp;An additional
+performance expense in multithreaded programs &nbsp;is that individual
+reference count increments and decrements must themselves be atomic and
+hense relatively expensive on many architectures. &nbsp;As a
+consequence, we believe that compiled multithreaded Gel programs will
+generally perform poorly today; in a following section we describe
+possible future work to alleviate this limitation.
+<h3>Benchmark Performance</h3>
+
+To compare Gel's performance with that of languages using manual memory
+management and languages using garbage collection, we've implemented
+several benchmark programs in C++, Java, C# and Gel. &nbsp;The
+source
+code to these benchmarks is available at the Gel project site.
+&nbsp;The benchmarks include the following:
+<ul>
+
+  <li><code>sort</code>: on each of a series of
+iterations,&nbsp;generates a
+list of 1,000,000 randomly generated integers and sorts them using a
+recursive mergesort algorithm.</li>
+
+  <li><code>sortstring</code>: like the <code>sort</code>
+benchmark, but uses a list of 400,000 randomly generated strings.</li>
+
+  <li><code>binarytrees</code>: allocates and frees a
+large number of binary trees of various sizes. &nbsp;This program
+is from the Computer Language Shootout Benchmarks at
+http://shootout.alioth.debian.org/.<code></code><br>
+
+  </li>
+
+</ul>
+
+We've measured the performance of these benchmarks on a computer with a
+1.83 Ghz Intel Core 2 Duo processor and 2 Gb of RAM, running Ubuntu
+Linux 6.10. &nbsp;The C++ benchmarks (and the C++ code output by
+the
+Gel compiler) were compiled using gcc 4.1.2 using the -O2 optimization
+level. &nbsp;We used the Sun JDK
+1.5.0_08 to compile and run the Java benchmarks; we used the "server"
+(not "client") VM from the JDK. &nbsp;We compiled and ran the C#
+benchmarks using version&nbsp;1.1.17.1 of Mono
+(http://www.mono-project.com/), an open-source implementation of C#.
+&nbsp;Note that Mono uses the Boehm garbage collector
+(http://www.hpl.hp.com/personal/Hans_Boehm/gc/).<br>
+
+<br>
+
+For each benchmark run, we collected the following statistics:<br>
+
+<ul>
+
+  <li>CPU time (including both user and system time) in seconds.</li>
+
+  <li>Maximum virtual memory. &nbsp;This includes all pages
+mapped into
+the process's address space, including those not resident in physical
+memory, and including both private and shared pages.</li>
+
+  <li>Maximum resident memory. &nbsp;This includes only pages
+resident
+in physical memory. &nbsp;(Both private and shared pages are
+included.)</li>
+
+  <li>Maximum private writeable virtual memory. &nbsp;This
+includes
+only pages which are private to the process and are writeable.
+&nbsp;
+(Both resident and non-resident pages are included.)</li>
+
+</ul>
+
+We collected the virtual memory statistics using <code>ptime</code>,
+a program we wrote specifically for Linux; its source code is available
+on the project site.<br>
+
+<br>
+
+Here are the benchmark results; a discussion follows below.<br>
+
+<code><small><br>
+
+</small>sort 5</code><small><br>
+
+<br>
+
+</small>
+<small> </small><small> </small>
+<table style="text-align: left;" border="1" cellpadding="2" cellspacing="2">
+
+  <tbody>
+
+    <tr>
+
+      <td></td>
+
+      <td><small>CPU (sec)</small></td>
+
+      <td><small>virtual (Mb)</small></td>
+
+      <td><small>resident (Mb)</small></td>
+
+      <td><small>private/writeable (Mb)</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>C++</small></td>
+
+      <td style="text-align: right;"><small>7.2</small></td>
+
+      <td style="text-align: right;"><small>18.3</small></td>
+
+      <td style="text-align: right;"><small>16.5</small></td>
+
+      <td style="text-align: right;"><small>15.9</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>Java</small></td>
+
+      <td style="text-align: right;"><small>5.1</small></td>
+
+      <td style="text-align: right;"><small>709.5</small></td>
+
+      <td style="text-align: right;"><small>74.7</small></td>
+
+      <td style="text-align: right;" 199.7=""><small>651.4</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>C#</small></td>
+
+      <td style="text-align: right;"><small>3.6</small></td>
+
+      <td style="text-align: right;"><small>42.3</small></td>
+
+      <td style="text-align: right;"><small>27.4</small></td>
+
+      <td style="text-align: right;"><small>30.4</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>Gel</small></td>
+
+      <td style="text-align: right;"><small>5.6</small></td>
+
+      <td style="text-align: right;"><small>18.3</small></td>
+
+      <td style="text-align: right;"><small>16.6</small></td>
+
+      <td style="text-align: right;"><small>15.9</small></td>
+
+    </tr>
+
+  </tbody>
+</table>
+
+<code><small><br>
+
+</small>
+sortstring 5</code><small><br>
+
+<br>
+
+</small> <small> </small><small> </small><small>
+</small><small> </small><small> </small>
+<table style="text-align: left;" border="1" cellpadding="2" cellspacing="2">
+
+  <tbody>
+
+    <tr>
+
+      <td></td>
+
+      <td><small>CPU (sec)</small></td>
+
+      <td><small>virtual (Mb)</small></td>
+
+      <td><small>resident (Mb)</small></td>
+
+      <td><small>private/writeable (Mb)</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>C++</small></td>
+
+      <td style="text-align: right;"><small>4.5</small></td>
+
+      <td style="text-align: right;"><small>25.4</small></td>
+
+      <td style="text-align: right;"><small>23.6</small></td>
+
+      <td style="text-align: right;"><small>23.0</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>Java</small></td>
+
+      <td style="text-align: right;"><small>6.6</small></td>
+
+      <td style="text-align: right;"><small>708.0</small></td>
+
+      <td style="text-align: right;"><small>127.8</small></td>
+
+      <td style="text-align: right;" 199.7=""><small>650.8</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>C#</small></td>
+
+      <td style="text-align: right;"><small>6.8</small></td>
+
+      <td style="text-align: right;"><small>50.8</small></td>
+
+      <td style="text-align: right;"><small>33.5</small></td>
+
+      <td style="text-align: right;"><small>38.9</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>Gel</small></td>
+
+      <td style="text-align: right;"><small>5.1</small></td>
+
+      <td style="text-align: right;"><small>34.8</small></td>
+
+      <td style="text-align: right;"><small>33.0</small></td>
+
+      <td style="text-align: right;"><small>32.4</small></td>
+
+    </tr>
+
+  </tbody>
+</table>
+
+<br>
+
+<code>binary-trees 18</code><small><br>
+
+<br>
+
+</small>
+<small> </small><small> </small>
+<table style="text-align: left;" border="1" cellpadding="2" cellspacing="2">
+
+  <tbody>
+
+    <tr>
+
+      <td></td>
+
+      <td><small>CPU (sec)</small></td>
+
+      <td><small>virtual (Mb)</small></td>
+
+      <td><small>resident (Mb)</small></td>
+
+      <td><small>private/writeable (Mb)</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>C++</small></td>
+
+      <td style="text-align: right;"><small>10.6</small></td>
+
+      <td style="text-align: right;"><small>27.2</small></td>
+
+      <td style="text-align: right;"><small>25.4</small></td>
+
+      <td style="text-align: right;"><small>24.9</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>Java</small></td>
+
+      <td style="text-align: right;"><small>3.7</small></td>
+
+      <td style="text-align: right;"><small>707.4</small></td>
+
+      <td style="text-align: right;"><small>92.6</small></td>
+
+      <td style="text-align: right;" 199.7=""><small>650.2</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>C#</small></td>
+
+      <td style="text-align: right;"><small>17.5</small></td>
+
+      <td style="text-align: right;"><small>76.2</small></td>
+
+      <td style="text-align: right;"><small>65.9</small></td>
+
+      <td style="text-align: right;"><small>64.3</small></td>
+
+    </tr>
+
+    <tr>
+
+      <td><small>Gel</small></td>
+
+      <td style="text-align: right;"><small>18.1</small></td>
+
+      <td style="text-align: right;"><small>27.2</small></td>
+
+      <td style="text-align: right;"><small>25.5</small></td>
+
+      <td style="text-align: right;"><small>24.9</small></td>
+
+    </tr>
+
+  </tbody>
+</table>
+
+<br>
+
+Memory usage was remarkably consistent across the benchmarks.
+&nbsp;For every memory statistic in every benchmark, Java consumed
+the most memory, followed by C#, followed by Gel, followed by C++.
+&nbsp;In every benchmark except for <code>sortstring</code>,
+Gel's memory consumption was only slightly greater than C++'s.
+&nbsp;In the <code>sortstring</code> benchmark Gel
+used about 40% memory than C++; this is presumably because Gel
+represents a string using a structure containing&nbsp;a reference
+count and a character pointer, whereas the C++ version of the benchmark
+represents a strings using a character pointer alone. &nbsp;In this
+benchmark Gel nevertheless used significantly less virtual memory than
+C# and significantly less physical memory than Java.<br>
+
+<br>
+
+CPU usage was not nearly so consistent across benchmarks. &nbsp;In
+two benchmarks C++ was faster than both Java and C#; in one
+benchmark&nbsp; both Java and C# were faster; and in one benchmark (<code>binary-trees</code>)
+Java was, surprisingly, over twice as fast as C++, but C# was much
+slower. &nbsp;Gel's performance relative to C++ also varied from
+benchmark to benchmark. &nbsp;In sortstring Gel was about 15%
+slower; in <code>binary-trees</code> Gel was about 70%
+slower. &nbsp;In the <code>sort</code> benchmark Gel
+was, oddly, faster than C++; this is surprising because the Gel
+compiler generates C++ code. &nbsp;Perhaps the&nbsp;code
+generated by the Gel compiler triggers some optimization which doesn't
+occur when the C++ version is compiled; we hope to have an explanation
+for this by the time the final version of this paper is published.<br>
+
+<br>
+
+</body>
+</html>

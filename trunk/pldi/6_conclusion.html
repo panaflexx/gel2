@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+
+
+
+  
+  
+  <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
+
+
+  
+
+
+  
+  
+  
+  <title>Safe Ownership-Based Memory Management</title>
+  <meta content="Adam Dingle" name="author">
+
+
+
+  
+  
+  <style type="text/css">
+h1 { font-size: 18pt;
+font-weight: bold;
+font-family: Arial,Helvetica,sans-serif;
+text-align: center;
+}
+.author { font-family: Arial,Helvetica,sans-serif;
+font-size: 12pt;
+text-align: center;
+}
+address { text-align: center;
+font-family: Arial,Helvetica,sans-serif;
+font-size: 10pt;
+font-style: normal;
+}
+body {
+font-size: 9pt;
+}
+h2 { font-family: Times New Roman,Times,serif;
+font-size: 12pt;
+font-weight: bold;
+}
+h3 { font-family: Times New Roman,Times,serif;
+font-size: 12pt;
+font-weight: bold;
+}
+h4 { font-family: Times New Roman,Times,serif;
+font-size: 11pt;
+font-style: italic;
+font-weight: normal;
+}
+  </style>
+</head>
+
+
+<body>
+
+<h2>CONCLUSION</h2>
+
+
+
+<h3>Acknowledgements</h3>
+
+
+
+I'd like to thank Linus Upson for his invaluable feedback and
+encouragement throughout my work on Gel at Google. &nbsp;David
+Bacon
+provided further encouragement and pointed me to various related work.
+&nbsp;Discussions with Paul Haahr were also useful. &nbsp;Feng
+Qian
+ported the Gel compiler from Windows to Linux. &nbsp;Many thanks
+are
+due to Google for allowing me to release the Gel compiler as open
+source.
+<h3>REFERENCES</h3>
+
+
+
+<p>[Gel] The Gel Programming Language, at
+http://gel2.googlecode.com/svn/trunk/doc/gel2_language.html .</p>
+
+
+
+<p>[Hejlsberg, 2004] Anders Hejlsberg, Scott Wiltamuth and Peter
+Golde.&nbsp; <i>
+The C# Programming Language</i>.&nbsp; Addison-Wesley, 2004.</p>
+
+
+
+<p>[Henglein, 2005] Fritz Henglein, Henning Makholm, and Henning
+Niss.&nbsp; Effect Types and Region-Based Memory
+Management.&nbsp; In Benjamin C. Pierce, editor, <i>Advanced
+Topics in Types and Programming Languages</i>, MIT Press, 2005.</p>
+
+
+
+<p>[Jones, 1996] Richard Jones and Rafael Lins.&nbsp; <i>Garbage
+Collection: Algorithms for Automatic Dynamic Memory Management</i>.&nbsp;
+John Wiley &amp; Sons, 1996.</p>
+
+
+
+<p>[Pierce, 2002] Benjamin C. Pierce.&nbsp; <i>Types
+and Programming Languages</i>.&nbsp; MIT Press, 2002.</p>
+
+
+
+<h2>APPENDIX: SAMPLE PROGRAM</h2>
+
+
+
+<p>The following Gel program generates a list of 1,000,000 random
+integers, sorts them using a recursive mergesort and then verifies that
+the resulting list is in sorted order.</p>
+
+
+
+<h3>sort.gel</h3>
+
+
+
+<pre>class Random {<br> static int r_ = 1;<br><br> public static int Next() {<br> r_ = r_ * 69069;<br> return r_;<br> }<br>}<br><br>class Node {<br> public readonly int i_;<br> public Node ^next_;<br><br> public Node(int i, Node ^next) { i_ = i; next_ = next; }<br>}<br><br>class Sort {<br> static Node ^RandomList(int count) {<br> Node ^first = null;<br> for (int x = 0 ; x &lt; count ; ++x)<br> first = new Node(Random.Next(), first);<br> return first;<br> }<br><br> static Node ^Merge(Node ^a, Node ^b) {<br> Node ^head = null;<br> Node tail = null;<br> while (a != null &amp;&amp; b != null) {<br> Node ^top;<br> if (a.i_ &lt; b.i_) {<br> top = a;<br> a = take top.next_;<br> } else {<br> top = b;<br> b = take top.next_;<br> }<br> if (head == null) {<br> head = top;<br> tail = head;<br> } else {<br> tail.next_ = top;<br> tail = tail.next_;<br> }<br> }<br> Node ^rest = (a == null) ? b : a;<br> if (tail == null)<br> return rest;<br> tail.next_ = rest;<br> return head;<br> }<br><br> static Node ^MergeSort(Node ^a) {<br> if (a == null || a.next_ == null) return a;<br> Node c = a;<br> Node b = c.next_;<br> while (b != null &amp;&amp; b.next_ != null) {<br> c = c.next_;<br> b = b.next_.next_;<br> }<br> Node ^d = take c.next_;<br> return Merge(MergeSort(a), MergeSort(d));<br> }<br><br> public static void Main(String[] args) {<br> Node ^n = RandomList(1000000);<br> n = MergeSort(n);<br><br> while (n != null) {<br> Node next = n.next_;<br> if (next != null &amp;&amp; n.i_ &gt; next.i_) {<br> Console.WriteLine("failed");<br> return;<br> }<br> n = take n.next_;<br> }<br> Console.WriteLine("succeeded");<br> }<br>}<br></pre>
+
+
+
+</body>
+</html>

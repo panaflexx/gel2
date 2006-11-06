@@ -1,0 +1,826 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+
+  <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
+  <title>Safe Ownership-Based Memory Management</title>
+
+
+  <meta content="Adam Dingle" name="author">
+
+  <style type="text/css">
+h1 { font-size: 18pt;
+font-weight: bold;
+font-family: Arial,Helvetica,sans-serif;
+text-align: center;
+}
+.author { font-family: Arial,Helvetica,sans-serif;
+font-size: 12pt;
+text-align: center;
+}
+address { text-align: center;
+font-family: Arial,Helvetica,sans-serif;
+font-size: 10pt;
+font-style: normal;
+}
+body {
+font-size: 9pt;
+}
+h2 { font-family: Times New Roman,Times,serif;
+font-size: 12pt;
+font-weight: bold;
+}
+h3 { font-family: Times New Roman,Times,serif;
+font-size: 12pt;
+font-weight: bold;
+}
+h4 { font-family: Times New Roman,Times,serif;
+font-size: 11pt;
+font-style: italic;
+font-weight: normal;
+}
+  </style>
+</head>
+
+
+<body>
+
+<h2>THE GEL LANGUAGE</h2>
+
+<p>Gel is a subset of the C# programming language [Hejlsberg,
+2004] extended with ownership types.&nbsp; Our decision to extend
+C# rather than, say, Java was arbitrary, and it would be
+straightforward to construct a similar language extending Java or
+another object-oriented language.&nbsp; The Gel language is large
+enough to write useful programs, such as the Gel interpreter/compiler
+itself.</p>
+
+<p>Unlike languages with simple manual memory management schemes
+(such as malloc/free or new/delete), Gel is <dfn>safe</dfn>:
+a bug in a Gel program can never corrupt memory arbitrarily.&nbsp;
+Unlike garbage-collected languages, memory management in Gel is <i>deterministic</i>:
+objects are freed as soon as they are no longer needed.
+&nbsp;Unlike traditional reference-counting schemes, Gel can free
+data structures including <dfn>cycles</dfn> of pointers as
+described below.</p>
+
+<p>In this paper, we&nbsp;describe only Gel's ownership
+extensions to the
+C# language. &nbsp;A reader familiar with either C# or Java should
+be able to follow with no trouble; differences between the
+core&nbsp;C# and Java languages are relatively minor and are not
+relevant to the discussion here. For a complete description of Gel, see
+the&nbsp;language reference [Gel].
+&nbsp;The Gel project site (http://code.google.com/p/gel2/source)
+contains the Gel interpreter/compiler, released as open source under
+the MIT License.</p>
+
+We proceed as follows. &nbsp;We first
+give an informal overview of&nbsp;ownership in Gel,
+illustrated with a number of code examples. &nbsp;We then present
+detailed rules for type checking and an argument that the single-owner
+property holds in Gel.<br>
+
+<h3>Overview</h3>
+
+<p>Gel, like C#, includes both <dfn>value types</dfn>&nbsp;and
+<dfn>reference types</dfn>. &nbsp;Value types in Gel
+are
+primitive types including <code>bool</code>, <code>int</code>
+and <code>float</code>. Reference types include <code>object</code>,
+<code>string</code> and user-defined subclasses of <code>object</code>.
+&nbsp;Gel extends C#'s type
+system with <dfn>owning&nbsp;types</dfn>.&nbsp;
+The
+type T ^ (where T
+is a reference type) represents an owning
+pointer to
+an object of type <code>T</code>.&nbsp; A reference
+type written
+without a <code>^</code> character indicates a non-owning
+pointer. &nbsp;Like a non-owning pointer, an owning pointer may
+hold either an object reference or <code>null</code>.</p>
+
+<p>In Gel, as in C#, all value and reference types are ultimately
+derived from the top-level <code>object</code>
+type. &nbsp;Strictly speaking, inheritance applies only to value
+and
+reference types; owning types are not themselves considered members of
+the class inheritance graph.</p>
+
+<p>Local variables, method parameters, method return
+values and object fields may all have owning or non-owning types.</p>
+
+<p>In Gel there is
+always exactly one owning pointer to every object. &nbsp;As a
+consequence of this fact, all objects in a running Gel program belong
+to a set of ownership trees; tree roots include static fields of every
+class and local variables in every stack frame. &nbsp;(During the
+course of
+expression evaluation, temporary values of owning type may form
+additional tree roots.)</p>
+
+<p>Ownership
+of an object can <dfn>transfer</dfn>
+from an owning pointer
+P to an owning pointer Q. &nbsp;In this case we say that P <dfn>loses
+ownership</dfn>
+of the object and that Q <dfn>takes ownership</dfn> of the
+object.</p>
+
+<p>At run time, the Gel implementation keeps a count of the
+number of
+non-owning pointers to each object; this count may be zero or an
+arbitrary positive value. &nbsp;The count is used only for ensuring
+that no non-owning pointers remain to a destroyed object as described
+in a following section.</p>
+
+<p>Here's a minimal Gel program:</p>
+
+<pre>class Foo {<br> public static void Main() {<br> Foo ^f = new Foo();<br> }<br>}</pre>
+
+<p>The <code>new</code> operator returns an owning
+pointer.&nbsp; In this program, the local variable <code>f</code>
+receives ownership of the newly allocated object.&nbsp; When <code>Main()</code>
+exits and <code>f</code> goes out of scope, Gel destroys
+the object automatically.</p>
+
+<p>If an owning pointer variable is updated with a new value, any
+previously pointed-to object is destroyed immediately:</p>
+
+<pre>void Fun() {<br> Foo ^f = new Foo(); // allocates a new Foo<br> f = new Foo(); // the first Foo allocated is destroyed here<br> f = null; // the second Foo allocated is destroyed here<br> ...<br>}</pre>
+
+<p>An assignment to an owning&nbsp;variable causes an
+ownership transfer:</p>
+
+<pre>void Fun() {<br> Foo ^f = new Foo();<br> Foo ^g = f; // ownership transfers to g<br>}</pre>
+
+<p>It is a compile-time error to read from any local
+variable which may have lost ownership:</p>
+
+<pre>void Fun() {<br> Foo ^f = new Foo();<br> Foo ^g = f; // ownership transfers to g<br> Foo h = f; // error: f has lost ownership<br>}<br></pre>
+
+The Gel type checker enforces this restriction by performing control
+flow
+analysis on each method and ensuring that no owning variable loses
+ownership on any code path leading to a point where the variable is
+read. &nbsp;This is a straightforward extension of the mechanism
+used to ensure that every variable is initialized before use.<br>
+
+<br>
+
+Gel could, alternatively, cause an owning local variable to become null
+if it loses ownership. &nbsp;We've decided against this behavior
+since this side effect might not be obviously apparent to someone
+reading the code. &nbsp;More fundamentally, this would destroy the
+language's <dfn>erasure</dfn> property, described in a
+following section.<br>
+
+<h3>Fields</h3>
+
+As mentioned above, object fields&nbsp;(including both instance
+fields and static
+fields) may have either owning or non-owning types.&nbsp; Here is a
+singly linked list class
+which&nbsp;holds
+an integer in each node:
+<pre>class Node {<br> public Node ^next_;<br> public int i_;<br> public Node(int i) { i_ = i; }<br>}<br></pre>
+
+Gel includes an operator <code>take</code>&nbsp; which
+takes ownership of
+a value from an owning field, and has the side effect of
+setting the field's value to <code>null</code>.
+&nbsp;An expression which reads an owning field without using <code>take</code>
+has a non-owning pointer type:
+<pre>void main() {<br>&nbsp; Node ^n = new Node(5);<br>&nbsp; n.next_ &nbsp;= new Node(4);<br> Node ^p = n.next_; // compile-time error: no conversion from Node to Node ^<br>&nbsp; Node ^p = take n.next_; &nbsp;// okay: ownership transfers; now n.next_ is null<br>}<br></pre>
+
+<p>Gel&nbsp;could conceivably take ownership from and null
+out owning fields automatically whenever they're read in an owning
+context; then the <code>take</code> operator would be
+unnecessary.&nbsp; But then the side effect of nulling out a field
+would be much less apparent to programmers; Gel includes <code>take</code>
+so that this side effect is explicit (and to preserve the erasure
+property described below).<br>
+
+</p>
+
+<h3>Methods</h3>
+
+A method parameter with owning type&nbsp;takes
+ownership of the value passed to that parameter when the method is
+invoked.&nbsp; If a method's return type is owning, then the
+method's caller takes ownership of the return value when the method
+returns.<br>
+
+<br>
+
+Here is a doubly linked list class with
+an integer in each node; its constructor takes arguments with owning
+and non-owning pointer types:
+<pre>class Node {<br> int i_;<br> public Node ^next_;<br> public Node prev_;</pre>
+
+<pre> public Node(int i, Node ^n, Node p) { i_ = i; next_ = n; prev_ = p; }<br>}</pre>
+
+<p>As a larger example, the following method&nbsp;takes an
+integer <code>k</code>
+and returns a doubly linked list containing the integers 1 through <code>k</code>:</p>
+
+<pre>Node ^IntList(int k) {<br> Node ^n = null;<br> for (int i = 1 ; i &lt;= k ; ++i) {<br> Node o = n; // keep a pointer to previous head of list<br> n = new Node(i, n, null);<br> if (o != null)<br> o.prev_ = n; // create backlink<br> }<br> return n;<br>}</pre>
+
+<p>In the line which calls the <code>new Node()</code>
+constructor, the owning variable <code>n</code> first
+loses ownership of the object it points to, since it passes that value
+to a constructor parameter with owning type: the constructor takes
+ownership of the object passed.&nbsp; After the constructor
+returns, <code>n</code> receives ownership of the newly
+allocated object.</p>
+
+<h3>Type Casts</h3>
+
+<p>Type casts in Gel never affect whether a type is owning; a
+cast is always from an owning type to an owning type or from an
+non-owning type to an non-owning type.&nbsp; Syntactically, a cast
+is always written with a non-owning type, even if the type it affects
+is owning.&nbsp; Thus:</p>
+
+<pre>void Fun() {<br> Foo ^f = new Foo();<br> Bar ^b = (Bar) f; // f loses ownership to b here<br>}</pre>
+
+<p>Gel, like C#, includes operators <code>is</code>
+and <code>as</code>&nbsp;which perform run-time type
+checks. &nbsp;The expression <code>E is T</code>
+evaluates E to a value v, and returns true if v is of type T and false
+otherwise. &nbsp;The expression <code>E as T</code>
+evaluates E to a value v, and returns v if it is of type T and null
+otherwise. &nbsp;Like type casts, the <code>is</code>
+and <code>as</code>
+operators&nbsp;are&nbsp;always written with non-owning types,
+but may operate on either owning or non-owning types:</p>
+
+<pre>void Fun() {<br> Foo ^f = new Foo();<br> Bar ^b = f as Bar;<br>}</pre>
+
+<h3>this</h3>
+
+In Gel <code>this</code> is always a non-owning
+pointer:
+<pre>class Foo {<br> static Foo ^f;<br> ...<br> void Fun() {<br> f = this; // compile-time error: can't convert from Foo to Foo ^<br> }<br>}</pre>
+
+<h3>Strings</h3>
+
+<p>Strings in Gel are not owned; the type <code>string ^</code>
+does not exist.&nbsp; In a compiled Gel program, strings are
+internally reference counted; a string is freed when its reference
+count reaches zero.</p>
+
+<p>We thought about making strings owned in Gel, but strings are
+so common in real-world programs that we thought it might burdensome
+for programmers to have to worry about string ownership.&nbsp;
+There's no problem with using classical reference counting for strings:
+they don't point to other objects so they can never be involved in a
+pointer cycle.</p>
+
+<p>A <code>string</code> may be converted either to
+an <code>object ^</code>&nbsp; or to an <code>object</code>:</p>
+
+<pre>void Fun() {<br> object ^o = "a"; // ok<br> object p = "b"; // ok<br>}</pre>
+
+<h3>Arrays</h3>
+
+In Gel an array may hold either owning or non-owning pointers:
+<pre>void Fun() {<br> Foo [] ^a = new Foo[5]; // an array of non-owning pointers to Foo objects<br> Foo ^[] ^b = new Foo^[5]; // an array of owning pointers to Foo objects<br> b[0] = new Foo();<br> a[0] = b[0];<br>}</pre>
+
+<p>The <code>take</code> operator may operate on
+array elements:</p>
+
+<pre>void Fun() {<br> Foo ^[] ^a = new Foo^[5];<br> a[0] = new Foo();<br> Foo ^f = take a[0];<br>}<br></pre>
+
+<h3>Autoboxing</h3>
+
+Gel&nbsp;(like Java and C#) provides <dfn>autoboxing</dfn>:
+a simple value such an <code>int</code> or <code>bool</code>
+may be stored in a variable holding an object.&nbsp; In Gel, a
+boxed value always has the owning type <code>object ^</code>.&nbsp;
+For example:
+<pre>void Fun() {<br> object ^o = 7; // ok<br> object p = false; // compile-time error: can't convert from bool to object<br>}</pre>
+
+<p>In an owning type <code>T ^</code>, <code>T</code>
+must not be a value type; the types <code>int ^</code>
+and <code>bool ^</code> do not exist in Gel, for
+example.&nbsp; An unboxing conversion must be explicit, and yields
+a value type:</p>
+
+<pre>void Fun() {<br> object ^o = 7;<br> int i = (int) o;<br>}</pre>
+
+<h3>Object Destruction</h3>
+
+Whenever an owning pointer to an object o is destroyed without
+transferring ownership elsewhere, then Gel <dfn>destroys</dfn>
+o as
+follows.&nbsp; First&nbsp;Gel destroys all fields in o (in
+reverse lexical
+order); if any of these fields are owning pointers to other objects
+then those objects are destroyed recursively.&nbsp; Finally Gel
+checks
+o's non-owning
+reference count.&nbsp; If the reference count is non-zero, Gel
+issues a run-time error and terminates the program; otherwise Gel frees
+the memory used to store o and continues execution.
+<p>This simple destruction algorithm can destroy linked data
+structures automatically.
+&nbsp;If each node of
+a singly linked list contains an owning pointer to the next node in the
+list, then when a pointer to the list head goes out of scope Gel will
+destroy the entire list.</p>
+
+<p>Because an object's subobjects are destroyed before the
+object's
+reference count is checked, the algorithm can destroy many data
+structures containing pointer cycles. &nbsp;As a simple example,
+the
+following method uses the IntList method presented earlier to create a
+doubly-linked list containing 2 nodes:</p>
+
+<pre>void MakeList() {<br> Node ^n = IntList(2);<br>}<br></pre>
+
+When the method exits, the variable n goes out of scope and the list is
+destroyed automatically. &nbsp;Initially, the first list node has a
+non-owning reference count of 1 since the second list node points to
+it. &nbsp;Before checking the first node's reference count, Gel
+destroys the second list node, which destroys the non-owning pointer to
+the first node and hence decrements the first node's reference count to
+0.<br>
+
+<br>
+
+In general, then, Gel&nbsp;can automatically destroy any data
+structure in
+which every non-owning pointer from an object o points to an object
+which is an ancestor of o in the object ownership tree.<br>
+
+<br>
+
+Gel's object destruction algorithm has some significant limitations.
+&nbsp;Most fundamentally, it cannot destroy arbitrary graphs
+of non-owning pointers; if a data structure contains non-owning
+pointers to non-ancestor nodes, then the programmer must write code to
+null out those pointers before the structure is destroyed.
+&nbsp;Another problem is that&nbsp;the algorithm may use a
+large amount
+of stack space when destroying objects due to its recursive nature.
+&nbsp;In the Extensions section, below, we propose a better
+algorithm
+for destroying objects in Gel.<br>
+
+<h3>Type Conversions</h3>
+
+In the sections above we've&nbsp;described how ownership interacts
+with various Gel language features, and presented various examples
+where Gel allows or disallows conversions between owning and non-owning
+types. &nbsp;In this section we give a more complete description of
+Gel's&nbsp;rules for type conversions.<br>
+
+<br>
+
+Gel classifies each expression in a program as one of the following <dfn>kinds</dfn>:<br>
+
+<ul>
+
+  <li>A <dfn>variable</dfn>: either</li>
+
+  <ul>
+
+    <li>a local variable or method parameter variable</li>
+
+    <li><code>(type) E</code>, where E is classified
+as a variable</li>
+
+    <li><code>E as type</code>, where E is classified
+as a variable</li>
+
+    <li><code>E ? E1 : E2</code>, where E1 and E2 are
+classified as variables</li>
+
+  </ul>
+
+  <li>A <dfn>field</dfn>: either</li>
+
+  <ul>
+
+    <li>an access to a instance field or static field</li>
+
+    <li>an access to an array element</li>
+
+  </ul>
+
+  <li>A <dfn>value</dfn>: any other expression</li>
+
+</ul>
+
+Gel, like C# and Java, includes both <dfn>implicit</dfn>
+and <dfn>explicit</dfn>
+type
+conversions. &nbsp;A number of language contructs implicitly
+convert a
+value to a destination type. &nbsp;Explicit type conversions are
+performed by the type cast operator and by a small number of other
+language constructs.<br>
+
+<br>
+
+Every implicit conversion in Gel takes place in one of the following
+conversion contexts:<br>
+
+<ul>
+
+  <li>Assignment context: in an assignment V = E, when implicitly
+converting from the type of E to the type of V</li>
+
+  <li>Argument conversion context: in a method call, when
+implicitly converting a method&nbsp;argument to its corresponding
+parameter type</li>
+
+  <li>Return context: when converting the expression in a return
+statement to the method's return type</li>
+
+  <li>Other context: used for a small number of additional
+conversions</li>
+
+</ul>
+
+We now present Gel's implicit and explicit conversion rules.
+&nbsp;(We
+omit rules relating to conversions between value types, such
+as&nbsp;between int and char; these rules are detailed in the Gel
+reference manual and are similar to value conversion rules in C#.)<br>
+
+<h4>Implicit conversions</h4>
+
+Every type T is implicitly convertible to itself.
+<p>If a&nbsp;type T is derived from a type U, then T is
+implicitly convertible to U.</p>
+
+<p>The null type is implicitly convertible to any reference type
+or owning type.</p>
+
+<p>T ^ is implicitly convertible to U ^ if T is implicitly
+convertible to U.</p>
+
+<p>In an argument conversion or local assignment context, T ^ is
+implicitly convertible to U if T is implicitly convertible to U, and
+either</p>
+
+<ul>
+
+  <li>the conversion is in an argument conversion context, or</li>
+
+  <li>the conversion is in an assigment context, and the source
+expression is classified as a variable.</li>
+
+</ul>
+
+Any value type is implicitly convertible to <code>object ^</code>.&nbsp;
+In an argument conversion context, any value type is also implicitly
+convertible to <code>object</code>.&nbsp; These
+conversions are&nbsp;<dfn>boxing conversions</dfn>.&nbsp;
+In a compiled Gel program, a boxing conversion allocates a boxed object
+instance.
+<p><code>string</code> is implicitly convertible to <code>object
+^</code>&nbsp; and to <code>object</code> .</p>
+
+<h4>Explicit conversions<br>
+
+</h4>
+
+f T is implicitly convertible to U, then T is explicitly convertible to
+U.
+<p>If a&nbsp;type T is derived from a type U, then U is
+explicitly convertible to T.&nbsp; This conversion will fail if the
+source value is not an instance of T.</p>
+
+<p>T ^ is explicitly convertible to U ^ if T is explicitly
+convertible to U.</p>
+
+<p><code>object</code> and <code>object ^</code>
+are explicitly convertible to any value type T; this is&nbsp;an <dfn>unboxing
+conversion</dfn>.&nbsp; This conversion will fail if the
+source value is not actually an instance of T.</p>
+
+<p><code>object</code> and <code>object ^</code>
+are explicitly convertible to
+<code>string</code>.&nbsp; This conversion will fail if
+the source value is not actually a string.</p>
+
+<h4>Discussion</h4>
+
+Gel never allows a type conversion to a non-owning to an owning pointer
+type. &nbsp;A conversion from an owning to a non-owning pointer is
+allowed only in certain contexts as per the rules above; when such a
+conversion occurs, at run time the source pointer retains ownership and
+a new non-owning pointer is created. The conversion rules disallow
+conversions which would inevitably lead to object destruction errors at
+run time. &nbsp;As an example, consider the following method:<br>
+
+<br>
+
+Foo Fun() {<br>
+
+&nbsp; return new Foo();<br>
+
+}<br>
+
+<br>
+
+The type conversion from Foo ^ to Foo occurs in a return context, and
+is hence disallowed. &nbsp;Gel could theoretically allow this type
+conversion and generate code for the method. &nbsp;Then at method
+exit
+the newly allocated Foo object would be destroyed (since it is owned by
+a temporary owning pointer, and ownership hasn't transferred
+elsewhere). But the&nbsp;destroyed object's non-owning pointer
+count
+would be 1, representing the non-owning pointer&nbsp;returned from
+the
+method, and so the object destruction would yield a run-time error.
+<h3>Safety</h3>
+
+In this section we use an informal argument to show that every Gel
+object
+always has a single owner, and&nbsp;that hence Gel is type safe.<br>
+
+<br>
+
+At run time in Gel, every owning pointer is always one of the following:<br>
+
+<ul>
+
+  <li>a variable: either a local variable or method parameter
+variable.</li>
+
+  <li>a field: either an instance field, a static field, or an
+array element</li>
+
+  <li>a temporary value in an expression</li>
+
+</ul>
+
+When each object is created, it has a single owner: the temporary value
+returned by the <code>new</code> operator.<br>
+
+<br>
+
+Suppose that a new owning pointer to an existing object o is created.
+&nbsp;o already exists, so the new pointer must take ownership from
+some existing pointer P. &nbsp;Then P must be owning, since the
+language provides no type convesion from a non-owning to an owning
+pointer.<br>
+
+<br>
+
+If P is a variable V, Gel
+ensures
+that V cannot be read again, as described in the Overview
+section above. &nbsp;The runtime implementation may not bother to
+overwrite V's value in memory, but V is unreadable and hence is not
+considered an
+owner;&nbsp;the new owner is the only owner of the
+object.<br>
+
+<br>
+
+If P is a field, then the new pointer must be created using the <code>take</code>
+operator;
+any other expression reading a field value yields a non-owning pointer.
+&nbsp;The <code>take</code>
+operator
+nulls out the field, and so the new owner is the only owner.<br>
+
+<br>
+
+Suppose that P is a temporary value. &nbsp;Every temporary in
+expression evaluation is consumed at most
+once, so in this case
+the
+new owner is the only owner; the old value cannot be read again.
+&nbsp;As a simple example, in the statement "Foo ^f = new Foo()"
+the
+temporary value returned by <code>new Foo()</code> is
+consumed once and only once, as it is assigned to f.
+&nbsp;(Note that it is possible that an owning temporary will not
+lose
+ownership, as in the statement "Fun();" where the method Fun returns an
+owning pointer. &nbsp;In this case Gel destroys the object as the
+temporary value is destroyed.)<br>
+
+<br>
+
+We have shown, then, that whenever a new owning pointer to an object is
+created the single-owner property is preserved. Since every object
+begins with a single
+owner, this means that in every running program every object always has
+a single owner during its&nbsp;lifetime.<br>
+
+<br>
+
+Safety follows immediately from the single-owner property. &nbsp;We
+assume that the underlying C# language is safe and that all safety
+checks (such as array bounds checks) are preserved in the Gel
+implementation. &nbsp;We will argue that every pointer which might
+ever be read points to a live object (i.e. an object which has not yet
+been destroyed); we call this the safety property. &nbsp;The safety
+property is trivially true at the beginning of program execution, when
+there are no pointers and no objects. &nbsp;We will show that this
+property is true before any of the following events, then it is also
+true afterward:<br>
+
+<ul>
+
+  <li>An object is created. &nbsp;In this case the new
+operator returns a new owning pointer to the newly created object,
+which is live.</li>
+
+  <li>A pointer is created. &nbsp;If this is not a new object
+creation, then the new pointer's value must be initialized from some
+existing pointer P. &nbsp;Since the safety property was true
+before,&nbsp;P points to a live object; therefore the new pointer
+points to a live object as well.</li>
+
+  <li>An object O is destroyed. &nbsp;In this case there must
+be no non-owning pointers to O; otherwise a run-time error would
+result. &nbsp;We have shown that there must be only a single owning
+pointer to O, which must be destroyed at the same time since every
+object destruction is caused by an owning pointer destruction.
+&nbsp;So after O is destroyed there can be no outstanding pointers
+to it.</li>
+
+  <li>A pointer is destroyed. &nbsp;If this is a non-owning
+pointer then this causes a reference count decrement, which occurs in a
+live object since the safety property holds beforehand. &nbsp;If
+this is a owning pointer then this causes an object destruction as
+outlined in the preceding case.</li>
+
+</ul>
+
+We conclude that the safety property always holds. &nbsp;As a
+consequence, no pointer access will ever touch deallocated memory and
+so Gel is safe.
+<h3>Erasure</h3>
+
+Note that Gel adds only two syntactic elements to C#: the type
+constructor ^ and the operator take.<br>
+
+<br>
+
+Suppose that we apply the following <dfn>erasure</dfn>
+transformation to a Gel
+program P:<br>
+
+<ul>
+
+  <li>We remove every instance of the ^ type constructor: we
+replace T ^ with T everywhere.</li>
+
+  <li>For each instance take E of the take operator, let T ^ be
+the
+compile-time type of E. &nbsp;Then we replace take E with the
+function call Take(ref E), where Take is defined as follows:</li>
+
+</ul>
+
+<pre>T Take(ref T p) {<br> T v = p;<br> p = null;<br> return v;<br>}<br></pre>
+
+(Informally, this is a function which works like the take operator but
+acts on a non-owning type).<br>
+
+<br>
+
+Then the resulting program P' is a valid C# program. &nbsp;If P
+terminates without error, then P' will also terminate without error and
+will yield the same value as P.<br>
+
+<br>
+
+Note that the converse is not true: it is possible that P' may
+terminate without error, but that P will yield a run-time error.
+&nbsp;To see this, consider the following Gel function:<br>
+
+<br>
+
+int Fun() {<br>
+
+&nbsp; Foo ^f = new Foo();<br>
+
+&nbsp; Foo g = f;<br>
+
+&nbsp; f = null;<br>
+
+&nbsp; return 4;<br>
+
+}<br>
+
+<br>
+
+This function will yield a run-time error in Gel, since at the moment f
+is destroyed there is still a non-owning pointer g to the same object.
+&nbsp;But if we apply the erasure transformation to this function,
+then the resulting C# function will execute without error.<br>
+
+<h2>PROGRAMMING IN GEL</h2>
+
+We have described the Gel language and argued that it is safe.
+&nbsp;We must now address two questions: how easy&nbsp;is it to
+use Gel's type system for writing real programs, and how well will Gel
+programs perform? &nbsp;We discuss usability in this section and
+performance in the following section.<br>
+
+<br>
+
+We believe that many programmers writing in&nbsp;languages such as
+C++ write code which frees objects based on&nbsp;ownership
+relationships between objects. &nbsp;For example, most C++
+programmers have written destructors which free objects pointed to by
+the destroyed object. &nbsp;The popular scoped_ptr template class
+from the Boost ++ library implements the ownership relationship; when a
+scoped_ptr is destroyed the object it points to is freed automatically.
+In some sense, then, Gel takes the existing informal notion of object
+ownership and encodes it into the type system.<br>
+
+<br>
+
+But how practical is ownership as a universal memory management
+paradigm? &nbsp;We've only written one large program in Gel, namely
+the Gel compiler/interpreter itself. &nbsp;In writing the Gel
+compiler we found that most objects had natural owners; ownership works
+particularly well for trees of objects such as the abstract syntax tree
+generated by parsing. &nbsp;Certain objects' lifetimes
+were&nbsp;indefinite, and we generally chose to allocate such
+objects from <dfn>pools</dfn>: arrays of objects held at top level in the program.
+&nbsp;Such objects were owned by the pools themselves; we used
+non-owning pointers to the objects throughout the program.&nbsp;(The Gel implementation, in fact, includes a primitive type
+<code>pool</code> which can be used for allocations of this sort; we will not discuss pools further in this paper.)<br>
+<br>
+The Gel implementation includes both a compiler and an interpreter.
+&nbsp;In implementing the interpreter, we chose to represent owning
+pointers in the interpreted language using owning pointers in the
+interpreter itself. &nbsp;This means that the interpreter has no code
+to free objects in the interpreted program explicitly; instead, objects
+in the interpreted program are freed automatically when no longer
+needed. &nbsp;(This is similar to implementing an interpreter for a
+garbage-collected language in a garbage-collected language, in which
+case the interpreter itself need not concern itself with garbage
+collection, which "flows through" the interpreter to the interpreted
+program.)<br>
+<br>
+The interpreter contains numerous code paths which must manipulate
+values in the interpreted language which might either be owned or
+unowned pointers. &nbsp;To handle this situation, the interpreter code
+has a class RValue with&nbsp;two subclasses: GValue, which holds a
+value directly, and Reference, which holds a non-owning pointer to a
+GValue. &nbsp;Code which manipulates values in the interpreted language
+generally represents them using a variable of type RValue ^. &nbsp;If
+this underlying value is owning, the variable holds the underlying
+value directly; if it is not, the variable holds a Reference pointing
+to the value. &nbsp;This was slightly awkward. &nbsp;We hope that this
+particular &nbsp;coding difficulty was an artifact of implementing a
+Gel interpreter in Gel itself, and that most programs in Gel will not
+need to manipulate values whose ownership status is unknown at compile
+time.
+<h3>Circular data structures</h3>
+
+<p>It's possible for a Gel program to create cycles of owning
+pointers.&nbsp; The following program creates two <code>Bar</code>
+objects which point to each other:</p>
+
+<pre>class Bar {<br> Bar ^next_;<br><br> static void MakeACycle() {<br> Bar ^n = new Bar();<br> Bar ^o = new Bar();<br> Bar p = o;<br> n.next_ = o;<br> p.next_ = n;<br> }<br>}</pre>
+
+<p>These objects will never be destroyed.&nbsp; Gel only
+destroys structures containing no owning pointer cycles; this is a
+weaker guarantee than that provided by a garbage collector, which can
+destroy structures containing arbitrary pointer cycles.</p>
+
+<p>But this hardly matters in practical programming.&nbsp;
+It's hard to create an owning pointer cycle by mistake in Gel, because
+the type system guarantees that a programmer can't create an owning
+pointer cycle and return an owning pointer to it.&nbsp; For
+example, if we modify the <code>MakeACycle</code> method
+above to return a <code>Bar&nbsp;^</code> and add the
+line <code>return n;</code> at the end of the method, we
+receive a compile-time error: we can't return <code>n</code>
+because ownership has already transferred away from it (in the
+assignment to
+<code>p.next_</code>).</p>
+
+<p>All common data structures can be coded without using owning
+pointer cycles.&nbsp; For inherently circular structures such as a
+circular linked list, the Gel programmer must either (a) allocate all
+list nodes using a separate owner object (such as&nbsp;an allocation
+pool as described earlier in this section) and then create the circular
+links using non-owning pointers, or (b) intentionally create a cycle of
+owning pointers as in the <code>MakeACycle</code>
+method above, then break the the cycle manually when deciding to
+destroy the list. &nbsp;This is somewhat unnatural in Gel, but circular
+structures form only a small fraction of data structures encountered in
+typical programs.</p>
+
+<br>
+
+</body>
+</html>
