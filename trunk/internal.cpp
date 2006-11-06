@@ -311,6 +311,10 @@ class Dummy {
 // in two phases and so its reference count may not be zero when ~_Object() first runs.
 const int PendingDestroy = 0x70000000;
 
+#ifdef PROFILE_REF_OPS
+int g_totalRefInc = 0;  // total number of reference count increments
+#endif
+
 // _Object contains only non-virtual methods.  If a GEL2 program never uses a class as
 // an Object, we derive the class from _Object to save a vtable pointer.
 class _Object {
@@ -330,6 +334,9 @@ public:
   void _PtrInc() {
 #if MEMORY_SAFE
     ++count_;
+#ifdef PROFILE_REF_OPS
+    ++g_totalRefInc;
+#endif
 #endif
   }
 
@@ -1234,6 +1241,9 @@ int gel_runmain2(void (*gmain)(), void (*gmain_a)(_Array<StringPtr > *), int arg
   } __except(_exception_filter(GetExceptionInformation())) {
     _exit(0);
   }
+#endif
+#ifdef PROFILE_REF_OPS
+  printf("total ref incs = %d\n", g_totalRefInc);
 #endif
   return 0;
 }

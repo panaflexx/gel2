@@ -1446,7 +1446,8 @@ abstract class Expression : Node {
   public abstract string Emit();    // return a C++ expression representing this GEL2 expression
 
   public bool NeedsRef(GType type) {
-    return Gel.program_.safe_ && type.IsOwned() && ExpressionTraverser.NeedRef(start_, end_, this, type);
+    return Gel.program_.safe_ && type.IsOwned() &&
+      (Gel.always_ref_ || ExpressionTraverser.NeedRef(start_, end_, this, type));
   }
 
   // Emit this expression, adding a reference-counting _Ptr wrapper if needed.
@@ -3974,7 +3975,8 @@ class Local : Named {
   // Return true if we represent this local using a smart pointer wrapper (i.e.
   // _Ptr, _Own, _OwnRef or _Ref).
   public virtual bool IsWrapper() {
-    return type_ is Owning || type_ == GString.type_ || needs_ref_;
+    return type_ is Owning || type_ == GString.type_ ||
+      (Gel.always_ref_ ? type_.IsOwned() : needs_ref_);
   }
 
   public Local(TypeExpr type_expr, string name, Expression initializer) : base(type_expr, name) {
@@ -6265,7 +6267,9 @@ class Program {
   public bool crt_alloc_;
   public bool debug_;
   public bool safe_ = true;
-
+  
+  public bool profile_ref_;
+  
   public Control prev_;   // previous node in control flow graph, used during graph construction
 
   public void Import(string s) {
@@ -6411,6 +6415,8 @@ class Program {
       w.WriteLine("#define MEMORY_SAFE 1");
     if (crt_alloc_)
       w.WriteLine("#define MEMORY_CRT 1");
+    if (profile_ref_)
+      w.WriteLine("#define PROFILE_REF_OPS 1");
 
     foreach (string f in cpp_import_)
       w.WriteLine("#include {0}", GString.EmitString(f));
@@ -7016,6 +7022,8 @@ class Gel {
 
   public static bool error_test_;
   public static bool print_type_sets_;
+  
+  public static bool always_ref_;
 
   public static readonly ArrayList /* of int */ expected_error_lines_ = new ArrayList();
   public static readonly ArrayList /* of int */ error_lines_ = new ArrayList();
@@ -7114,6 +7122,8 @@ class Gel {
           }
           output = Path.GetFileNameWithoutExtension(args[i]);
           break;
+        case "-p": program_.profile_ref_ = true; break;
+	case "-r": always_ref_ = true; break;
         case "-u": program_.safe_ = false; break;
         case "-v": verbose_ = true; break;
         case "-cpp": cpp_only = true; break;

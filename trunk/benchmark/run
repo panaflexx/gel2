@@ -1,6 +1,6 @@
 for prog in ./$1-cpp "java $1" ./$1-cs.exe ./$1-gel
 do
   echo $prog $2
-  ptime $prog $2
+  ./ptime $prog $2
   echo
 done
