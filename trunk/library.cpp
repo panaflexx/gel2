@@ -199,7 +199,7 @@ public:
   static const int Unix = 0, Win32NT = 1;
 };
 
-class OperatingSystem {
+class OperatingSystem : public _Object {
 public:
   int get_Platform() {
 #if _WINDOWS
