@@ -62,22 +62,22 @@ font-weight: normal;
 <h2>RELATED WORK</h2>
 
 
-Our work represents one of many attempts to find a "sweet spot" in the
+<p>Our work represents one of many attempts to find a "sweet spot" in the
 trade-off space between fully manual and fully automatic memory management
 (that is, garbage collection).  There are many inter-related issues, chief
 among them being memory footprint, run-time cost, determinism, and ease of
-programming.  We compare our work to that of others across these various axes. 
+programming.  We compare our work to that of others across these various axes.</p>
 
-Region-based memory management [cite AED?] provides bulk-freeing of objects,
+<p>Region-based memory management provides bulk-freeing of objects,
 often based on a stack discipline.  Regions generally provide low cost and good
 determinism, but if provided in a safe manner either require either burdensome
 annotation [Tofte type 1] or an analysis which is frequently over-conservative
 [Tofte type 2].  Region systems that follow a stack discipline often suffer
 from large numbers of object being assigned (by analysis or by the programmer)
 to the global region which is never collected (or must be collected by a
-supplementary garbage collector).  
+supplementary garbage collector).  </p>
 
-The Real-time Specification for Java (RTSJ) [cite Bolella] provides a
+<p>The Real-time Specification for Java (RTSJ) [Bollella'00] provides a
 stack-oriented region-based memory management based on Scopes.  Scopes have
 neither annotations nor automatic inference; instead it is the responsibility
 of the programmer to allocate objects in the correct scope.  Storing a pointer
@@ -87,56 +87,33 @@ to prevent and are highly dependent on interactions between different
 components.  In addition, it is often either convenient or necessary to place
 objects in the outermost scope (called Immortal memory), in particular when it
 is necessary to share objects between scope-managed and garbage-collected
-memory.  
+memory.  </p>
 
-The goals of the Cyclone language [Hicks et al'04] are probably most similar to
+<p>The goals of the Cyclone language [Hicks et al'04] are probably most similar to
 those of Gel; its goal is to provide a safe alternative to C for systems
 programming.  Cyclone provides several forms of safe memory management:
 regions, unique pointers, and reference counting.  Cyclone's regions require
 explicit annotations in the source code, and can be both lexically scoped (in
 the style of [Tofte 1]) or dynamically scoped.  In the latter case, if a region
 is freed dynamically subsequent attempts to access objects in that region will
-generate a run-time exception.
+generate a run-time exception.</p>
 
-Cyclone's unique pointers are based on linear types [cite] and are essentially
-like Gel's owning pointers, but without the capability to reference count
-non-owning references.  Some polymorphism across memory management styles is
-provided by allowing sets of unique pointers to be temporarily treated as
-though they belong to a region.
+<p>Cyclone's unique pointers are based on linear types [cite] and are
+essentially like Gel's owning pointers, but without the capability to reference
+count non-owning references.  Some polymorphism across memory management styles
+is provided by allowing sets of unique pointers to be temporarily treated as
+though they belong to a region.  Cyclone also provides explicit (but safe)
+reference counting; reference counted objects are treated as belonging to a
+special region called RC.</p>
 
-Cyclone also provides explicit (but safe) reference counting; reference counted
-objects are treated as belonging to a special region called RC.
-
-The experience of the language designers in writing the Cyclone compiler is
+<p>The experience of the language designers in writing the Cyclone compiler is
 instructive: first coarse-grained regions were used, which reduced the
 annotation burden.  However, coarse regions did not free memory soon enough and
 led to excessive space consumption.  The compiler was then re-written using
 fine-grained regions, at which point the annotations became overly cumbersome.
-Eventually the compiler was re-written to use garbage collection [Morrisett '05].
+Eventually the compiler was re-written to use garbage collection [Morrisett '05].</p>
 
-
-Ownership types have received considerable attention in recent years.  Unlike
-Gel's concept of ownership, these approaches rely entirely on the type system
-[Boyapati, Boyland].  Ownership is used for a variety of purposes: modularity
-[Clarke et al'01], improved alias analysis and optimization [..],
-thread-locality [..], and real-time memory management [Boyapati et al -
-PLDI'03; Zhao et al'04].  Generally speaking, these approaches have a high
-annotation overhead and/or require significant redundant code due.
-
-Corsaro and Cytron
-
-MSR system that has owned pointer regions
-
-Gay
-
-Real-time garbage collection [Bacon et al, POPL'03; Henriksson PhD] provides
-overall timing determinism and ease of programming, but suffers from the memory
-overhead issues associated with garbage collection in general, and does not
-provide determinism in terms of the times at which individual objects are
-freed.  Also, during garbage collection some fraction of the CPU time (on the
-order of 30%) is unavailable to real-time tasks.
-
-The design goals of our system are loosely similar to those of
+<p>The design goals of our system are loosely similar to those of
 systems using
 <dfn>region-based memory management</dfn> [Henglein, 2005];
 such systems may also free memory without using explicit deallocation
@@ -146,36 +123,26 @@ objects soon after they are no longer needed.&nbsp; The type
 annotations in our system are also much simpler than those in many
 region-based systems.<br>
 
+<p>Ownership types have received considerable attention in recent years.  Unlike
+Gel's concept of ownership, these approaches rely entirely on the type system
+[Boyapati, Boyland].  Ownership is used for a variety of purposes: modularity
+[Clarke et al'01], improved alias analysis and optimization [..],
+thread-locality [..], and real-time memory management [Boyapati et al -
+PLDI'03; Zhao et al'04].  Generally speaking, these approaches have a high
+annotation overhead and/or require significant redundant code due.
+
+<!-- Corsaro and Cytron.  MSR system that has owned pointer regions.  Gay -->
+
+<p>Real-time garbage collection [Bacon et al, POPL'03; Henriksson PhD] provides
+overall timing determinism and ease of programming, but suffers from the memory
+overhead issues associated with garbage collection in general, and does not
+provide determinism in terms of the times at which individual objects are
+freed.  Also, during garbage collection some fraction of the CPU time (on the
+order of 30%) is unavailable to real-time tasks.</p>
+
 
 
 <br>
-
-Chandrasekhar Boyapati, Alexandru Salcianu, William S. Beebee, Martin
-C. Rinard: Ownership types for safe region-based memory management in real-time
-Java. PLDI 2003: 324-337
-
-Chandrasekhar Boyapati, Barbara Liskov, Liuba Shrira: Ownership types for
-object encapsulation. POPL 2003: 213-223 
-
-Michael W. Hicks, J. Gregory Morrisett, Dan Grossman, Trevor Jim: Experience
-with safe manual memory-management in cyclone. ISMM 2004: 73-84
-
-Greg Morrisett, Personal communication, 2005.
-
-John Boyland: Alias burying: Unique variables without destructive
-reads. Softw., Pract. Exper. 31(6): 533-553 (2001)
-
-Tian Zhao, James Noble, Jan Vitek: Scoped Types for Real-Time Java. RTSS 2004:
-241-251
-
-David F. Bacon, Perry Cheng, V. T. Rajan: A real-time garbage collector with
-low overhead and consistent utilization. POPL 2003: 285-298 
-
-Roger Henriksson: Scheduling Garbage Collection in Embedded Systems. 
-Ph.D. thesis, Lund University, 1998
-
-David G. Clarke, James Noble, John Potter: Simple Ownership Types for Object
-Containment. ECOOP 2001: 53-76 
 
 </body>
 </html>

@@ -67,7 +67,7 @@ font-weight: normal;
 
 
 <h1>Ownership You Can Count On:<br>
-A Hybrid Approach to Safe High-performance Explicit Memory Management
+A Hybrid Approach to Safe Explicit Memory Management
 </h1>
 
 <div class="author">Authors Omitted for Double-blind Review<br></div>
@@ -108,8 +108,8 @@ programs require at most [35%] more memory than the corresponding C++ programs,
 while C# and Java require at least twice as much memory and often considerably
 more.  Run-time performance varies considerably across all languages, with no
 clear winner, but Gel outperforms either C++ or Java/C# in all but one
-benchmark.  Our optimization eliminate a mean of ZZ% of all reference counting
-operations, speeding Gel programs by YY%.
+benchmark.  Our optimization eliminate a mean of [89%] of all reference counting
+operations, speeding Gel programs by 20-40%.
 
 <!-- End Abstract (but it's too long... trim) -->
 
@@ -152,27 +152,44 @@ code may be used to release system resources when no longer needed.</p>
 
 
 <p>In this paper we propose an automatic memory management
-mechanism based on ownership types and run-time reference
+mechanism based on ownership and run-time reference
 counts.&nbsp; The mechanism can be used to implement a safe
 language which frees objects deterministically.&nbsp; To show that
 the ownership mechanism is practical, we've constructed a simple
-object-oriented language Gel which is essentially a subset of C#
+object-oriented language called Gel which is essentially a subset of C# 
+[Hejlsberg, 2004] 
 extended with ownership-based memory management.&nbsp; We've
 implemented an interpreter and compiler for Gel, written in the Gel
 language itself.&nbsp;&nbsp; We've ported a number of common
 benchmark programs to Gel and have found that the Gel implementations
 often perform similarly to their C++ counterparts and use significantly
-less memory than their Java and C# equivalents.<br>
+less memory than their Java and C# equivalents.</p>
 
 
+<p>Unlike languages with simple manual memory management schemes
+(such as malloc/free or new/delete), Gel is <dfn>safe</dfn>:
+a bug in a Gel program can never corrupt memory arbitrarily.&nbsp;
+Unlike garbage-collected languages, memory management in Gel is <i>deterministic</i>:
+objects are freed as soon as they are no longer needed.
+&nbsp;Unlike traditional reference-counting schemes, Gel can free
+data structures including <dfn>cycles</dfn> of pointers as
+described below.</p>
 
-</p>
-
-
-
-<h3>OWNERSHIP-BASED MEMORY MANAGEMENT</h3>
-
-
+<p>In this paper, we&nbsp;describe only Gel's ownership
+extensions to the
+C# language. &nbsp;A reader familiar with either C# or Java should
+be able to follow with no trouble; differences between the
+core&nbsp;C# and Java languages are relatively minor and are not
+relevant to the discussion here. For a complete description of Gel, see
+the&nbsp;language reference [Gel].
+&nbsp;The Gel project site (http://code.google.com/p/gel2/source)
+contains the Gel interpreter/compiler, released as open source under
+the MIT License.  Our decision to extend
+C# rather than, say, Java was arbitrary, and it would be
+straightforward to construct a similar language extending Java or
+another object-oriented language.&nbsp; The Gel language is large
+enough to write useful programs, such as the Gel interpreter/compiler
+itself.</p>
 
 <p>Our proposed memory management mechanism has the following
 fundamental characteristics:</p>
@@ -224,21 +241,14 @@ condition.</li>
 </ul>
 
 
-
-<p>Our goal in this work is to show that a safe language with
-such a
-type system and memory management mechanism can be implemented, and can
-be practical in the
+<p>Our goal in this work is to show that a safe language with such a type system
+and memory management mechanism can be implemented, and can be practical in the
 following senses:</p>
-
-
 
 <ul>
 
-
-
   <li>It is easy to write real programs so that they pass the
-type checker; impementing common data structures is straightforward.</li>
+type checker; implementing common data structures is straightforward.</li>
 
 
 
@@ -256,24 +266,36 @@ memory and CPU time as their manually managed counterparts.</li>
 
 
 
-<p>To this end, we've designed and implemented a simple
-object-oriented language, Gel, which uses ownership-based memory
-management.&nbsp; In the remainder of this paper we'll describe
-Gel in some detail and discuss how Gel performs on some
-real-world benchmarks.</p>
+<p>The contributions of this work are:</p>
+
+<ul>
+
+  <li>A unique approach to safe memory management combining static type-based ownership
+  with run-time reference counts;</li>
+
+  <li>An implementation of the approach in a dialect of C# we call Gel;</li>
+
+  <li>Implementation of the Gel compiler and a number of benchmarks in
+  Gel;</li>
+
+  <li>Intra- and inter-procedural optimizations that take advantage of
+  ownership properties and make the reference counting cost acceptable by
+  eliminating [89%] of all counting operations;</li> 
+
+  <li>An experimental evaluation comparing the performance of one large Gel
+  program (the Gel compiler) to the same program written in C#, and of several
+  microbenchmarks written in Gel, C++, Java, and C#.</li>
+
+</ul>
 
 
-<!--
-<p>We could conceivably construct a minimal ownership-based type
-system based on a typed lambda calculus and provide formal proofs of
-type safety and other properties.&nbsp; We have not done that in
-this work, as our primary goal here is to demonstrate the viability of
-ownership-based memory management in a real-world
-implementation.&nbsp; We will not provide a&nbsp;proof of type
-safety for Gel, as the language is large enough that such a proof might
-be unwieldy.&nbsp; We nevertheless believe that the language as
-described is type safe.</p>
--->
+
+Currently, the major limitation of Gel is that its reference counting
+optimizations can not easily be applied in the presence of aliasing arising
+under multi-threading.  As a result, Gel currently only supports
+single-threaded programs.
+
+
 <br>
 </body>
 </html>

@@ -47,41 +47,12 @@ font-weight: normal;
 
 <h2>THE GEL LANGUAGE</h2>
 
-<p>Gel is a subset of the C# programming language [Hejlsberg,
-2004] extended with ownership types.&nbsp; Our decision to extend
-C# rather than, say, Java was arbitrary, and it would be
-straightforward to construct a similar language extending Java or
-another object-oriented language.&nbsp; The Gel language is large
-enough to write useful programs, such as the Gel interpreter/compiler
-itself.</p>
-
-<p>Unlike languages with simple manual memory management schemes
-(such as malloc/free or new/delete), Gel is <dfn>safe</dfn>:
-a bug in a Gel program can never corrupt memory arbitrarily.&nbsp;
-Unlike garbage-collected languages, memory management in Gel is <i>deterministic</i>:
-objects are freed as soon as they are no longer needed.
-&nbsp;Unlike traditional reference-counting schemes, Gel can free
-data structures including <dfn>cycles</dfn> of pointers as
-described below.</p>
-
-<p>In this paper, we&nbsp;describe only Gel's ownership
-extensions to the
-C# language. &nbsp;A reader familiar with either C# or Java should
-be able to follow with no trouble; differences between the
-core&nbsp;C# and Java languages are relatively minor and are not
-relevant to the discussion here. For a complete description of Gel, see
-the&nbsp;language reference [Gel].
-&nbsp;The Gel project site (http://code.google.com/p/gel2/source)
-contains the Gel interpreter/compiler, released as open source under
-the MIT License.</p>
 
 We proceed as follows. &nbsp;We first
 give an informal overview of&nbsp;ownership in Gel,
 illustrated with a number of code examples. &nbsp;We then present
 detailed rules for type checking and an argument that the single-owner
 property holds in Gel.<br>
-
-<h3>Overview</h3>
 
 <p>Gel, like C#, includes both <dfn>value types</dfn>&nbsp;and
 <dfn>reference types</dfn>. &nbsp;Value types in Gel
@@ -184,7 +155,7 @@ fields) may have either owning or non-owning types.&nbsp; Here is a
 singly linked list class
 which&nbsp;holds
 an integer in each node:
-<pre>class Node {<br> public Node ^next_;<br> public int i_;<br> public Node(int i) { i_ = i; }<br>}<br></pre>
+<pre>class Node {<br> public Node ^next;<br> public int i;<br> public Node(int j) { i = j; }<br>}<br></pre>
 
 Gel includes an operator <code>take</code>&nbsp; which
 takes ownership of
@@ -192,7 +163,7 @@ a value from an owning field, and has the side effect of
 setting the field's value to <code>null</code>.
 &nbsp;An expression which reads an owning field without using <code>take</code>
 has a non-owning pointer type:
-<pre>void main() {<br>&nbsp; Node ^n = new Node(5);<br>&nbsp; n.next_ &nbsp;= new Node(4);<br> Node ^p = n.next_; // compile-time error: no conversion from Node to Node ^<br>&nbsp; Node ^p = take n.next_; &nbsp;// okay: ownership transfers; now n.next_ is null<br>}<br></pre>
+<pre>void main() {<br>&nbsp; Node ^n = new Node(5);<br>&nbsp; n.next &nbsp;= new Node(4);<br> Node ^p = n.next; // compile-time error: no conversion from Node to Node ^<br>&nbsp; Node ^p = take n.next; &nbsp;// okay: ownership transfers; now n.next is null<br>}<br></pre>
 
 <p>Gel&nbsp;could conceivably take ownership from and null
 out owning fields automatically whenever they're read in an owning
@@ -217,15 +188,15 @@ returns.<br>
 Here is a doubly linked list class with
 an integer in each node; its constructor takes arguments with owning
 and non-owning pointer types:
-<pre>class Node {<br> int i_;<br> public Node ^next_;<br> public Node prev_;</pre>
+<pre>class Node {<br> int i;<br> public Node ^next;<br> public Node prev;</pre>
 
-<pre> public Node(int i, Node ^n, Node p) { i_ = i; next_ = n; prev_ = p; }<br>}</pre>
+<pre> public Node(int j, Node ^n, Node p) { i = j; next = n; prev = p; }<br>}</pre>
 
 <p>As a larger example, the following method&nbsp;takes an
 integer <code>k</code>
 and returns a doubly linked list containing the integers 1 through <code>k</code>:</p>
 
-<pre>Node ^IntList(int k) {<br> Node ^n = null;<br> for (int i = 1 ; i &lt;= k ; ++i) {<br> Node o = n; // keep a pointer to previous head of list<br> n = new Node(i, n, null);<br> if (o != null)<br> o.prev_ = n; // create backlink<br> }<br> return n;<br>}</pre>
+<pre>Node ^IntList(int k) {<br> Node ^n = null;<br> for (int i = 1 ; i &lt;= k ; ++i) {<br> Node o = n; // keep a pointer to previous head of list<br> n = new Node(i, n, null);<br> if (o != null)<br> o.prev = n; // create backlink<br> }<br> return n;<br>}</pre>
 
 <p>In the line which calls the <code>new Node()</code>
 constructor, the owning variable <code>n</code> first
@@ -240,7 +211,7 @@ allocated object.</p>
 <p>Type casts in Gel never affect whether a type is owning; a
 cast is always from an owning type to an owning type or from an
 non-owning type to an non-owning type.&nbsp; Syntactically, a cast
-is always written with a non-owning type, even if the type it affects
+is always written without the "<code>^</code>", even if the type it affects
 is owning.&nbsp; Thus:</p>
 
 <pre>void Fun() {<br> Foo ^f = new Foo();<br> Bar ^b = (Bar) f; // f loses ownership to b here<br>}</pre>
@@ -286,16 +257,16 @@ an <code>object ^</code>&nbsp; or to an <code>object</code>:</p>
 <h3>Arrays</h3>
 
 In Gel an array may hold either owning or non-owning pointers:
-<pre>void Fun() {<br> Foo [] ^a = new Foo[5]; // an array of non-owning pointers to Foo objects<br> Foo ^[] ^b = new Foo^[5]; // an array of owning pointers to Foo objects<br> b[0] = new Foo();<br> a[0] = b[0];<br>}</pre>
+<pre>void Fun() {<br> Foo [] ^a = new Foo[5]; // an owned array of non-owning pointers to Foo objects<br> Foo ^[] ^b = new Foo^[5]; // an owned array of owning pointers to Foo objects<br> Foo ^[] c = new Foo^[5]; // a non-owned array of owning pointers to Foo objects<br> b[0] = new Foo();<br> a[0] = b[0];<br>}</pre>
 
 <p>The <code>take</code> operator may operate on
 array elements:</p>
 
-<pre>void Fun() {<br> Foo ^[] ^a = new Foo^[5];<br> a[0] = new Foo();<br> Foo ^f = take a[0];<br>}<br></pre>
+<pre>void Fun() {<br> Foo ^[] ^a = new Foo^[5];<br> a[0] = new Foo();<br> Foo ^f = take a[0]; // a[0] is null after the take<br>}<br></pre>
 
 <h3>Autoboxing</h3>
 
-Gel&nbsp;(like Java and C#) provides <dfn>autoboxing</dfn>:
+Gel&nbsp;(like Java 5 and C#) provides <dfn>autoboxing</dfn>:
 a simple value such an <code>int</code> or <code>bool</code>
 may be stored in a variable holding an object.&nbsp; In Gel, a
 boxed value always has the owning type <code>object ^</code>.&nbsp;
@@ -317,10 +288,10 @@ transferring ownership elsewhere, then Gel <dfn>destroys</dfn>
 o as
 follows.&nbsp; First&nbsp;Gel destroys all fields in o (in
 reverse lexical
-order); if any of these fields are owning pointers to other objects
-then those objects are destroyed recursively.&nbsp; Finally Gel
-checks
-o's non-owning
+order).  If any of these fields are owning pointers to other objects
+then those objects are destroyed recursively; if any fields are non-owning
+pointers the reference count of their referent is decremented.&nbsp; Finally Gel
+checks o's non-owning
 reference count.&nbsp; If the reference count is non-zero, Gel
 issues a run-time error and terminates the program; otherwise Gel frees
 the memory used to store o and continues execution.
@@ -789,7 +760,7 @@ time.
 pointers.&nbsp; The following program creates two <code>Bar</code>
 objects which point to each other:</p>
 
-<pre>class Bar {<br> Bar ^next_;<br><br> static void MakeACycle() {<br> Bar ^n = new Bar();<br> Bar ^o = new Bar();<br> Bar p = o;<br> n.next_ = o;<br> p.next_ = n;<br> }<br>}</pre>
+<pre>class Bar {<br> Bar ^next;<br><br> static void MakeACycle() {<br> Bar ^n = new Bar();<br> Bar ^o = new Bar();<br> Bar p = o;<br> n.next = o;<br> p.next = n;<br> }<br>}</pre>
 
 <p>These objects will never be destroyed.&nbsp; Gel only
 destroys structures containing no owning pointer cycles; this is a
@@ -806,7 +777,7 @@ line <code>return n;</code> at the end of the method, we
 receive a compile-time error: we can't return <code>n</code>
 because ownership has already transferred away from it (in the
 assignment to
-<code>p.next_</code>).</p>
+<code>p.next</code>).</p>
 
 <p>All common data structures can be coded without using owning
 pointer cycles.&nbsp; For inherently circular structures such as a

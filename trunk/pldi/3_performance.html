@@ -51,7 +51,8 @@ font-weight: normal;
 In this section we discuss the performance of compiled Gel programs,
 and describe the results of benchmarking&nbsp;experiments comparing Gel's
 performance to C++, Java and C#.<br>
-<h3>Reference Count Overhead</h3>
+
+<h3>Reference Count Optimization</h3>
 As described above, Gel keeps a count of non-owning pointers
 to every object. &nbsp;Gel's reference counts are significantly
 cheaper than those in a traditional reference-counted system, for three
@@ -120,18 +121,9 @@ variable's lifetime, including types which may be mutated during method
 calls invoked from those nodes. &nbsp;If none of these types are a
 supertype or subtype of the variable's own type, the compiler does not
 bother to count references from the variable to any object.<br>
-<h4>Multithreading</h4>
-An important caveat applies to the reference count optimization described in the previous section: <span style="font-style: italic;">it applies only to single-threaded programs</span>.
-&nbsp; In a multithreaded program, when optimizing a block of code
-which will run in one thread, the compiler cannot know in general
-whether some other thread might be mutating a graph of objects, and
-therefore cannot eliminate reference counts. &nbsp;An additional
-performance expense in multithreaded programs &nbsp;is that individual
-reference count increments and decrements must themselves be atomic and
-hense relatively expensive on many architectures. &nbsp;As a
-consequence, we believe that compiled multithreaded Gel programs will
-generally perform poorly today; in a following section we describe
-possible future work to alleviate this limitation.
+
+<p>INSERT REFCOUNT OPT RESULTS HERE</p>
+
 <h3>Benchmark Performance</h3>
 
 To compare Gel's performance with that of languages using manual memory

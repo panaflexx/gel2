@@ -50,7 +50,7 @@ font-weight: normal;
 </h2>
 
 In this section we sketch a number of possible extensions to the Gel
-language. &nbsp;We have not implemented any of these.<br>
+language. We have not implemented any of these.<br>
 
 <h2>Object Destruction</h2>
 
@@ -75,7 +75,7 @@ stack space since it is inherently recursive.</li>
 </ul>
 
 To overcome these limitations, we propose adding destructors to Gel,
-and propose a multi-phase object destruction mechanism. &nbsp;Gel
+and propose a multi-phase object destruction mechanism. Gel
 could destroy an object graph rooted at a pointer P in the following
 phases.<br>
 
@@ -94,36 +94,36 @@ count is zero and free the object.<br>
 
 In many cases the compiler should be able to optimize away some or all
 of the work to be performed in the first and/or second phases.
-&nbsp;In particular, using static type analysis it will often be
+In particular, using static type analysis it will often be
 possible to determine that all objects in the graph below an object of
 type T will never have any destructors or non-owning pointers; in that
 case the first or second phases need not run at all below such objects.
-&nbsp;As a simple example, consider a singly linked list in which
+As a simple example, consider a singly linked list in which
 each node contains only an integer and an owning pointer to the next
 node; then the first and second phases can be optimized away
-entirely&nbsp;in destroying a list of this type.<br>
+entirelyin destroying a list of this type.<br>
 
 <br>
 
 Note also that in many structures each node contains only a single
 owning pointer; in such structures, the compiler can save stack space
 by eliminating tail recursion in generating the code to perform the
-recursive descent in each phase. &nbsp;With these optimizations in
+recursive descent in each phase. With these optimizations in
 place, we believe that this generalized destruction algorithm might
-outperform the&nbsp;algorithm in the existing Gel implementation in
+outperform thealgorithm in the existing Gel implementation in
 many cases.<br>
 
 <br>
 
 User-written destructors might potentially mutate the graph of objects
-being destroyed. &nbsp;If a destructor inserts objects into the
+being destroyed. If a destructor inserts objects into the
 graph, then these objects might be destroyed in phases 2 and 3 even
-though their destructors have never run. &nbsp;Similarly, if a
+though their destructors have never run. Similarly, if a
 destructor removes objects whose destructors have already run, then
-those objects' destructors might run again&nbsp;when they are
-destroyed at a later time. &nbsp;This possibility does not
+those objects' destructors might run againwhen they are
+destroyed at a later time. This possibility does not
 compromise the safety of the language, but does mean that each object's
-destructor is not guaranteed to run exactly once. &nbsp;It might be
+destructor is not guaranteed to run exactly once. It might be
 possible to detect destructor-induced mutations in some way and report
 an error if they occur; we will not discuss this possibility further
 here.<br>
@@ -131,43 +131,43 @@ here.<br>
 <h3>Polymorphism</h3>
 
 The Gel type system does not support any sort of polymorphism between
-owning and non-owning types. &nbsp;This means that it's not
+owning and non-owning types. This means that it's not
 possible to write a method which can receive either an owning or
-non-owning pointer as an input parameter. &nbsp;It's also not
+non-owning pointer as an input parameter. It's also not
 possible to implement a single data structure (such as a tree or hash
 table) which can hold either owning or non-owning pointer.
-&nbsp;This limitation is reflected in the Gel class library, which
+This limitation is reflected in the Gel class library, which
 contains separate ArrayList and NonOwningArrayList classes.<br>
 
 <br>
 
 It would be useful to extend Gel
-with&nbsp;generic types as found in Java and C#, allowing a generic
-type to represent either an owning or non-owning type. &nbsp;As a
+withgeneric types as found in Java and C#, allowing a generic
+type to represent either an owning or non-owning type. As a
 simple example, suppose that we'd like to implement a class
-Pair&lt;T&gt; which holds two objects of type T. &nbsp;We'd
+Pair&lt;T&gt; which holds two objects of type T. We'd
 like to be able to instantiate the class using either an owning or
-non-owning pointer type. &nbsp;Our generic type system might allow
+non-owning pointer type. Our generic type system might allow
 this as follows:<br>
 
 <br>
 
 class Pair&lt;T&gt; {<br>
 
-&nbsp; T first_, second_;<br>
+T first_, second_;<br>
 
-&nbsp; Pair(T first, T second) { first_ = first; second_ = second; }<br>
+Pair(T first, T second) { first_ = first; second_ = second; }<br>
 
-&nbsp; T% First() { return first_; }<br>
+T% First() { return first_; }<br>
 
-&nbsp; T% Second() { return second_; }<br>
+T% Second() { return second_; }<br>
 
 }<br>
 
 <br>
 
 The system includes a type operator % which can be applied only to a
-generic type, and which removes ownership from a type. &nbsp;In
+generic type, and which removes ownership from a type. In
 particular, if T is Foo ^, then T% is Foo; if T is Foo, then T% is also
 Foo.<br>
 
@@ -183,7 +183,7 @@ function which can take either a Foo[] or a Foo^[] as a parameter.<br>
 
 We believe that it should not be difficult to design a complete
 generics system for Gel including covariance, but we will not explore
-the idea further in this work.&nbsp;<br>
+the idea further in this work.<br>
 
 <h2>Multithreading</h2>
 
@@ -194,22 +194,25 @@ significant limitation.<br>
 <br>
 
 It would be useful to extend Gel to be able to execute multithreaded
-programs safely and efficiently. &nbsp;We can imagine two different
-possible approaches here. &nbsp;First,&nbsp;it might be
-possible to extend Gel's&nbsp;optimizer to be able to infer that
+programs safely and efficiently. We can imagine two different
+possible approaches here. First,it might be
+possible to extend Gel'soptimizer to be able to infer that
 many data structures are accessed only from a single thread; then
 reference counts in such structures could be optimized away using the
-existing algorithm. &nbsp;Such inference seems difficult and we are
+existing algorithm. Such inference seems difficult and we are
 relatively pessimistic about such an approach.<br>
+
 <br>
+
 As another
 approach, we could possibly extend Gel so that objects are grouped
 into <dfn>apartments</dfn>
 which may be accessed from only a single thread at
-once. &nbsp;With this approach, the existing optimization algorithm
-could be used to eliminate&nbsp;reference count accesses in code which
-executes inside a single apartment. &nbsp;It might be possible to
-design&nbsp;system which guarantees that only pointers of a certain
+once. With this approach, the existing optimization algorithm
+could be used to eliminatereference count accesses in code
+which
+executes inside a single apartment. It might be possible to
+designsystem which guarantees that only pointers of a certain
 kind may cross apartment boundaries and which allows groups of objects
 to move efficiently between apartments; we leave this to further work.<br>
 
